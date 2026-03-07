@@ -1,9 +1,0 @@
-    Checking system-monitor v0.1.0 (C:\Users\habee\Desktop\Habeeb\DesktopApps\system-monitor\src-tauri)
-error[E0599]: no method named `unwrap_or_else` found for struct `std::string::String` in the current scope
-  --> src\lib.rs:65:39
-   |
-65 |     let cpu_arch = System::cpu_arch().unwrap_or_else(|| "Unknown".to_string());
-   |                                       ^^^^^^^^^^^^^^ method not found in `std::string::String`
-
-For more information about this error, try `rustc --explain E0599`.
-error: could not compile `system-monitor` (lib) due to 1 previous error
