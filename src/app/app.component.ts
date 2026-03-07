@@ -41,7 +41,14 @@ interface SystemStats {
   net_transmitted: number;
   processes: ProcessInfo[];
   gpu_name: string;
+  gpu_usage: number;
+  vram_used: number;
+  vram_total: number;
   battery_level: number | null;
+  disk_read_speed: number;
+  disk_write_speed: number;
+  ping: number;
+  wifi_signal: number;
 }
 
 @Component({
@@ -55,16 +62,22 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('cpuCanvas') cpuCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('memoryCanvas') memoryCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChildren('coreCanvas') coreCanvases!: QueryList<ElementRef<HTMLCanvasElement>>;
+  @ViewChild('gpuCanvas') gpuCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('pingCanvas') pingCanvas!: ElementRef<HTMLCanvasElement>;
 
   systemStats: SystemStats | null = null;
   interval: any;
 
   cpuChart: Chart | null = null;
   memoryChart: Chart | null = null;
+  gpuChart: Chart | null = null;
+  pingChart: Chart | null = null;
   coreCharts: Chart[] = [];
 
   cpuHistory: number[] = new Array(30).fill(0);
   memoryHistory: number[] = new Array(30).fill(0);
+  gpuHistory: number[] = new Array(30).fill(0);
+  pingHistory: number[] = new Array(30).fill(0);
   coreHistories: number[][] = [];
 
   lastNetReceived = 0;
@@ -108,6 +121,12 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       const memPct = (stats.memory_used / stats.memory_total) * 100;
       this.memoryHistory.push(memPct);
       this.memoryHistory.shift();
+
+      this.gpuHistory.push(stats.gpu_usage || 0);
+      this.gpuHistory.shift();
+
+      this.pingHistory.push(stats.ping || 0);
+      this.pingHistory.shift();
 
       if (this.coreHistories.length === 0) {
         this.coreHistories = stats.cpus.map(() => new Array(30).fill(0));
@@ -178,6 +197,43 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
         options: commonOptions
       });
     }
+
+    if (this.gpuCanvas) {
+      this.gpuChart = new Chart(this.gpuCanvas.nativeElement, {
+        type: 'line',
+        data: {
+          labels: new Array(30).fill(''),
+          datasets: [{
+            data: this.gpuHistory,
+            borderColor: '#ff5e5e',
+            borderWidth: 2,
+            fill: true,
+            backgroundColor: 'rgba(255, 94, 94, 0.1)',
+          }]
+        },
+        options: commonOptions
+      });
+    }
+
+    if (this.pingCanvas) {
+      this.pingChart = new Chart(this.pingCanvas.nativeElement, {
+        type: 'line',
+        data: {
+          labels: new Array(30).fill(''),
+          datasets: [{
+            data: this.pingHistory,
+            borderColor: '#39ff14',
+            borderWidth: 2,
+            fill: true,
+            backgroundColor: 'rgba(57, 255, 20, 0.1)',
+          }]
+        },
+        options: {
+          ...commonOptions,
+          scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, max: undefined } }
+        }
+      });
+    }
   }
 
   initCoreCharts() {
@@ -219,6 +275,14 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.memoryChart) {
       this.memoryChart.data.datasets[0].data = [...this.memoryHistory];
       this.memoryChart.update();
+    }
+    if (this.gpuChart) {
+      this.gpuChart.data.datasets[0].data = [...this.gpuHistory];
+      this.gpuChart.update();
+    }
+    if (this.pingChart) {
+      this.pingChart.data.datasets[0].data = [...this.pingHistory];
+      this.pingChart.update();
     }
     this.coreCharts.forEach((chart, i) => {
       if (chart) {
