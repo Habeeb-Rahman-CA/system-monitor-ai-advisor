@@ -1,9 +1,21 @@
 <main class="system-monitor-container">
   <header>
-    <h1>System Monitor</h1>
-    <div class="os-badge" *ngIf="systemStats">
-      <span class="os-icon">🖥️</span>
-      <span class="os-info">{{ systemStats.os_name }} {{ systemStats.os_version }}</span>
+    <div class="header-main">
+      <h1>System Monitor</h1>
+      <div class="os-badge" *ngIf="systemStats">
+        <span class="os-icon">🖥️</span>
+        <span class="os-info">{{ systemStats.os_name }} {{ systemStats.os_version }}</span>
+      </div>
+    </div>
+    <div class="header-badges" *ngIf="systemStats">
+      <div class="mini-badge">
+        <span class="label">UPTIME:</span>
+        <span class="value">{{ formatUptime(systemStats.uptime) }}</span>
+      </div>
+      <div class="mini-badge">
+        <span class="label">CORES:</span>
+        <span class="value">{{ systemStats.cpu_cores }}</span>
+      </div>
     </div>
   </header>
 
@@ -12,11 +24,30 @@
     <div class="stat-card cpu-card fade-in">
       <div class="card-header">
         <span class="icon">⚡</span>
-        <h3>CPU Usage</h3>
+        <h3>CPU History</h3>
         <span class="percentage">{{ systemStats.cpu_usage.toFixed(1) }}%</span>
       </div>
-      <div class="progress-bar">
-        <div class="progress-fill" [style.width.%]="systemStats.cpu_usage"></div>
+      <div class="chart-container">
+        <canvas #cpuCanvas></canvas>
+      </div>
+    </div>
+
+    <!-- Per-Core Grid (New) -->
+    <div class="stat-card cores-card fade-in">
+      <div class="card-header">
+        <span class="icon">🚥</span>
+        <h3>Per-Core Activity</h3>
+      </div>
+      <div class="cores-grid">
+        <div class="core-mini-card" *ngFor="let usage of systemStats.cpus; let i = index">
+          <div class="core-header">
+            <span class="core-label">C{{ i }}</span>
+            <span class="core-value">{{ usage.toFixed(0) }}%</span>
+          </div>
+          <div class="core-chart">
+            <canvas #coreCanvas></canvas>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -24,27 +55,70 @@
     <div class="stat-card ram-card fade-in">
       <div class="card-header">
         <span class="icon">🧠</span>
-        <h3>RAM Usage</h3>
+        <h3>Memory History</h3>
         <span class="percentage">{{ getMemoryPercentage().toFixed(1) }}%</span>
       </div>
-      <div class="memory-details">
-        <span>{{ formatBytes(systemStats.memory_used) }} occupied</span>
-        <span>{{ formatBytes(systemStats.memory_total) }} total</span>
+      <div class="chart-container">
+        <canvas #memoryCanvas></canvas>
       </div>
-      <div class="progress-bar">
-        <div class="progress-fill" [style.width.%]="getMemoryPercentage()"></div>
+      <div class="memory-details-compact">
+        <span>{{ formatBytes(systemStats.memory_used) }} / {{ formatBytes(systemStats.memory_total) }}</span>
+      </div>
+    </div>
+
+    <!-- Network Card -->
+    <div class="stat-card net-card fade-in">
+      <div class="card-header">
+        <span class="icon">🌐</span>
+        <h3>Network Speed</h3>
+      </div>
+      <div class="net-stats">
+        <div class="net-item">
+          <span class="direction">⏬ Download</span>
+          <span class="speed">{{ formatBytes(netSpeedIn) }}/s</span>
+        </div>
+        <div class="net-item">
+          <span class="direction">⏫ Upload</span>
+          <span class="speed">{{ formatBytes(netSpeedOut) }}/s</span>
+        </div>
+      </div>
+      <div class="net-totals">
+        <span>Total Rx: {{ formatBytes(systemStats.net_received) }}</span>
+        <span>Total Tx: {{ formatBytes(systemStats.net_transmitted) }}</span>
+      </div>
+    </div>
+
+    <!-- Disk Card -->
+    <div class="stat-card disk-card fade-in">
+      <div class="card-header">
+        <span class="icon">💾</span>
+        <h3>Disk Usage</h3>
+      </div>
+      <div class="disk-list">
+        <div class="disk-item" *ngFor="let disk of systemStats.disks">
+          <div class="disk-info">
+            <span class="disk-name">{{ disk.name || 'Local Disk' }}</span>
+            <span class="disk-pct">{{ getDiskUsagePercentage(disk).toFixed(0) }}%</span>
+          </div>
+          <div class="progress-bar small">
+            <div class="progress-fill" [style.width.%]="getDiskUsagePercentage(disk)"></div>
+          </div>
+          <div class="disk-space">
+            {{ formatBytes(disk.total_space - disk.available_space) }} used of {{ formatBytes(disk.total_space) }}
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Live Status -->
     <div class="live-indicator">
       <span class="dot pulse"></span>
-      Live Updates Enabled
+      Monitoring Live Metrics
     </div>
   </section>
 
   <section class="loading" *ngIf="!systemStats">
     <div class="spinner"></div>
-    <p>Initializing System Monitor...</p>
+    <p>Loading Deep Systems Data...</p>
   </section>
 </main>
