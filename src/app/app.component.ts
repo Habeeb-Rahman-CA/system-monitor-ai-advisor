@@ -129,14 +129,91 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   startupApps: StartupInfo[] = [];
   managementSearchTerm = '';
   mgmtSubTab: 'services' | 'startup' = 'services';
+  isLoadingMgmt = false;
+  lastMgmtRefresh = 0;
+
+  // Cached Filtered Lists
+  p_filteredProcesses: ProcessInfo[] = [];
+  p_filteredServices: ServiceInfo[] = [];
+  p_filteredStartupApps: StartupInfo[] = [];
 
   ngOnInit() {
     this.interval = setInterval(() => {
       this.fetchStats();
-      if (this.activeTab === 'management') {
+      const now = Date.now();
+      if (this.activeTab === 'management' && !this.isLoadingMgmt && (now - this.lastMgmtRefresh > 5000)) {
         this.refreshManagementData();
       }
     }, 1000);
+  }
+
+  updateCaches() {
+    this.updateFilteredProcesses();
+    this.updateFilteredServices();
+    this.updateFilteredStartupApps();
+  }
+
+  updateFilteredProcesses() {
+    if (!this.systemStats) return;
+
+    let list = this.systemStats.processes.map(p => ({
+      ...p,
+      isFavorite: this.favorites.has(p.pid)
+    }));
+
+    // Search filter
+    if (this.searchTerm) {
+      const term = this.searchTerm.toLowerCase();
+      list = list.filter(p => p.name.toLowerCase().includes(term) || p.pid.toString().includes(term));
+    }
+
+    // Sort
+    list.sort((a, b) => {
+      if (a.isFavorite && !b.isFavorite) return -1;
+      if (!a.isFavorite && b.isFavorite) return 1;
+
+      let valA = a[this.sortKey] as any;
+      let valB = b[this.sortKey] as any;
+
+      if (typeof valA === 'string') {
+        valA = valA.toLowerCase();
+        valB = (valB as string).toLowerCase();
+      }
+
+      if (valA < valB) return this.sortDir === 'asc' ? -1 : 1;
+      if (valA > valB) return this.sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    if (this.showTree && !this.searchTerm) {
+      this.p_filteredProcesses = this.buildProcessTree(list);
+    } else {
+      this.p_filteredProcesses = list.slice(0, 50);
+    }
+  }
+
+  updateFilteredServices() {
+    if (!this.managementSearchTerm) {
+      this.p_filteredServices = this.services;
+    } else {
+      const term = this.managementSearchTerm.toLowerCase();
+      this.p_filteredServices = this.services.filter(s =>
+        s.name.toLowerCase().includes(term) ||
+        s.display_name.toLowerCase().includes(term)
+      );
+    }
+  }
+
+  updateFilteredStartupApps() {
+    if (!this.managementSearchTerm) {
+      this.p_filteredStartupApps = this.startupApps;
+    } else {
+      const term = this.managementSearchTerm.toLowerCase();
+      this.p_filteredStartupApps = this.startupApps.filter(a =>
+        a.name.toLowerCase().includes(term) ||
+        a.command.toLowerCase().includes(term)
+      );
+    }
   }
 
   ngAfterViewInit() {
@@ -163,7 +240,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       this.lastNetTransmitted = stats.net_transmitted;
 
       this.systemStats = stats;
-
+      this.updateCaches();
       this.cpuHistory.push(stats.cpu_usage);
       this.cpuHistory.shift();
       const memPct = (stats.memory_used / stats.memory_total) * 100;
@@ -452,44 +529,108 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // --- Process Management Methods ---
 
-  get filteredProcesses(): ProcessInfo[] {
-    if (!this.systemStats) return [];
+  toggleFavorite(pid: number) {
+    if (this.favorites.has(pid)) this.favorites.delete(pid);
+    else this.favorites.add(pid);
+    this.updateFilteredProcesses();
+  }
 
-    let list = this.systemStats.processes.map(p => ({
-      ...p,
-      isFavorite: this.favorites.has(p.pid)
-    }));
-
-    // Search filter
-    if (this.searchTerm) {
-      const term = this.searchTerm.toLowerCase();
-      list = list.filter(p => p.name.toLowerCase().includes(term) || p.pid.toString().includes(term));
-    }
-
-    // Sort
-    list.sort((a, b) => {
-      // Favorites always on top
-      if (a.isFavorite && !b.isFavorite) return -1;
-      if (!a.isFavorite && b.isFavorite) return 1;
-
-      let valA = a[this.sortKey] as any;
-      let valB = b[this.sortKey] as any;
-
-      if (typeof valA === 'string') {
-        valA = valA.toLowerCase();
-        valB = (valB as string).toLowerCase();
+  async killProcess(pid: number) {
+    if (confirm(`Kill process ${pid}?`)) {
+      try {
+        await invoke('kill_process', { pid });
+        this.fetchStats();
+      } catch (e) {
+        alert("Failed to kill process: " + e);
       }
-
-      if (valA < valB) return this.sortDir === 'asc' ? -1 : 1;
-      if (valA > valB) return this.sortDir === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    if (this.showTree && !this.searchTerm) {
-      return this.buildProcessTree(list);
     }
+  }
 
-    return list.slice(0, 50); // Show top 50
+  setSort(key: ProcessSortKey) {
+    if (this.sortKey === key) {
+      this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortKey = key;
+      this.sortDir = 'desc';
+    }
+    this.updateFilteredProcesses();
+  }
+
+  onSearch(event: any) {
+    this.searchTerm = event.target.value;
+    this.updateFilteredProcesses();
+  }
+
+  toggleTree() {
+    this.showTree = !this.showTree;
+    this.updateFilteredProcesses();
+  }
+
+  toggleExpand(pid: number) {
+    if (this.expandedParents.has(pid)) this.expandedParents.delete(pid);
+    else this.expandedParents.add(pid);
+  }
+
+  // --- Management Methods ---
+
+  setActiveTab(tab: 'dashboard' | 'management') {
+    this.activeTab = tab;
+    if (tab === 'management') {
+      this.refreshManagementData();
+    }
+  }
+
+  setMgmtSubTab(subTab: 'services' | 'startup') {
+    this.mgmtSubTab = subTab;
+  }
+
+  async refreshManagementData() {
+    if (this.isLoadingMgmt) return;
+    this.isLoadingMgmt = true;
+    try {
+      if (this.mgmtSubTab === 'services') {
+        this.services = await invoke<ServiceInfo[]>('get_services');
+      } else {
+        this.startupApps = await invoke<StartupInfo[]>('get_startup_apps');
+      }
+      this.lastMgmtRefresh = Date.now();
+      this.updateFilteredServices();
+      this.updateFilteredStartupApps();
+    } catch (e) {
+      console.error("Failed to fetch management data", e);
+    } finally {
+      this.isLoadingMgmt = false;
+    }
+  }
+
+  get filteredServices() {
+    return this.p_filteredServices;
+  }
+
+  get filteredStartupApps() {
+    return this.p_filteredStartupApps;
+  }
+
+  get filteredProcesses() {
+    return this.p_filteredProcesses;
+  }
+
+  async toggleService(service: ServiceInfo) {
+    const action = service.status === 'Running' ? 'stop' : 'start';
+    try {
+      await invoke('control_service', { name: service.name, action });
+      // Powerhell RunAs is async in terms of the window opening, 
+      // so we just wait a bit and refresh
+      setTimeout(() => this.refreshManagementData(), 1000);
+    } catch (e) {
+      alert("Failed to control service: " + e);
+    }
+  }
+
+  onMgmtSearch(event: any) {
+    this.managementSearchTerm = event.target.value;
+    this.updateFilteredServices();
+    this.updateFilteredStartupApps();
   }
 
   private buildProcessTree(list: ProcessInfo[]): ProcessInfo[] {
@@ -516,103 +657,6 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
     addChildren(0, 0); // Start from roots
     return tree.slice(0, 50);
-  }
-
-  toggleFavorite(pid: number) {
-    if (this.favorites.has(pid)) this.favorites.delete(pid);
-    else this.favorites.add(pid);
-  }
-
-  async killProcess(pid: number) {
-    if (confirm(`Kill process ${pid}?`)) {
-      try {
-        await invoke('kill_process', { pid });
-        this.fetchStats(); // Refresh immediately
-      } catch (e) {
-        alert("Failed to kill process: " + e);
-      }
-    }
-  }
-
-  setSort(key: ProcessSortKey) {
-    if (this.sortKey === key) {
-      this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
-    } else {
-      this.sortKey = key;
-      this.sortDir = 'desc';
-    }
-  }
-
-  onSearch(event: any) {
-    this.searchTerm = event.target.value;
-  }
-
-  toggleTree() {
-    this.showTree = !this.showTree;
-  }
-
-  toggleExpand(pid: number) {
-    if (this.expandedParents.has(pid)) this.expandedParents.delete(pid);
-    else this.expandedParents.add(pid);
-  }
-
-  // --- Management Methods ---
-
-  setActiveTab(tab: 'dashboard' | 'management') {
-    this.activeTab = tab;
-    if (tab === 'management') {
-      this.refreshManagementData();
-    }
-  }
-
-  setMgmtSubTab(subTab: 'services' | 'startup') {
-    this.mgmtSubTab = subTab;
-  }
-
-  async refreshManagementData() {
-    try {
-      if (this.mgmtSubTab === 'services') {
-        this.services = await invoke<ServiceInfo[]>('get_services');
-      } else {
-        this.startupApps = await invoke<StartupInfo[]>('get_startup_apps');
-      }
-    } catch (e) {
-      console.error("Failed to fetch management data", e);
-    }
-  }
-
-  get filteredServices() {
-    if (!this.managementSearchTerm) return this.services;
-    const term = this.managementSearchTerm.toLowerCase();
-    return this.services.filter(s =>
-      s.name.toLowerCase().includes(term) ||
-      s.display_name.toLowerCase().includes(term)
-    );
-  }
-
-  get filteredStartupApps() {
-    if (!this.managementSearchTerm) return this.startupApps;
-    const term = this.managementSearchTerm.toLowerCase();
-    return this.startupApps.filter(a =>
-      a.name.toLowerCase().includes(term) ||
-      a.command.toLowerCase().includes(term)
-    );
-  }
-
-  async toggleService(service: ServiceInfo) {
-    const action = service.status === 'Running' ? 'stop' : 'start';
-    try {
-      await invoke('control_service', { name: service.name, action });
-      // Powerhell RunAs is async in terms of the window opening, 
-      // so we just wait a bit and refresh
-      setTimeout(() => this.refreshManagementData(), 1000);
-    } catch (e) {
-      alert("Failed to control service: " + e);
-    }
-  }
-
-  onMgmtSearch(event: any) {
-    this.managementSearchTerm = event.target.value;
   }
 
   updateAppUsageList() {

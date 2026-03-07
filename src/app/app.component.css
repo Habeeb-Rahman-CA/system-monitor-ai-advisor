@@ -6,6 +6,10 @@
   background: radial-gradient(circle at center, rgba(79, 172, 254, 0.02) 0%, transparent 70%);
 }
 
+.hidden {
+  display: none !important;
+}
+
 .titlebar {
   height: 38px;
   background: rgba(255, 255, 255, 0.03);
@@ -16,7 +20,7 @@
   align-items: center;
   position: sticky;
   top: 0;
-  z-index: 1000;
+  z-index: 10000;
   margin: 0 -1.5rem 1.5rem -1.5rem;
   padding: 0 0.75rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -26,6 +30,7 @@
   font-size: 0.9rem;
   margin-right: 8px;
   opacity: 0.8;
+  z-index: 10002;
 }
 
 .titlebar-text {
@@ -35,15 +40,30 @@
   color: rgba(255, 255, 255, 0.6);
   letter-spacing: 1px;
   text-transform: uppercase;
-  pointer-events: none;
+  z-index: 10002;
 }
 
+.drag-region {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(100% - 126px);
+  /* Exclude buttons area */
+  height: 100%;
+  pointer-events: none;
+  /* Let logo/text underneath receive clicks if needed, but the attribute handles drag */
+}
+
+/* Explicitly re-enable pointer events for buttons */
 .window-controls {
   display: flex;
   height: 100%;
+  z-index: 10001;
+  pointer-events: auto !important;
 }
 
 .window-button {
+  pointer-events: auto !important;
   display: flex;
   justify-content: center;
   align-items: center;
