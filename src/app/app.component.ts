@@ -69,6 +69,8 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChildren('coreCanvas') coreCanvases!: QueryList<ElementRef<HTMLCanvasElement>>;
   @ViewChild('gpuCanvas') gpuCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('pingCanvas') pingCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('netTrafficCanvas') netTrafficCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('diskIOHistoryCanvas') diskIOHistoryCanvas!: ElementRef<HTMLCanvasElement>;
 
   systemStats: SystemStats | null = null;
   interval: any;
@@ -77,13 +79,24 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   memoryChart: Chart | null = null;
   gpuChart: Chart | null = null;
   pingChart: Chart | null = null;
+  netTrafficChart: Chart | null = null;
+  diskIOChart: Chart | null = null;
   coreCharts: Chart[] = [];
 
-  cpuHistory: number[] = new Array(30).fill(0);
-  memoryHistory: number[] = new Array(30).fill(0);
-  gpuHistory: number[] = new Array(30).fill(0);
-  pingHistory: number[] = new Array(30).fill(0);
+  readonly HISTORY_LIMIT = 60; // 1 minute of history
+  cpuHistory: number[] = new Array(60).fill(0);
+  memoryHistory: number[] = new Array(60).fill(0);
+  gpuHistory: number[] = new Array(60).fill(0);
+  pingHistory: number[] = new Array(60).fill(0);
+  netDownHistory: number[] = new Array(60).fill(0);
+  netUpHistory: number[] = new Array(60).fill(0);
+  diskReadHistory: number[] = new Array(60).fill(0);
+  diskWriteHistory: number[] = new Array(60).fill(0);
   coreHistories: number[][] = [];
+
+  // App Usage Tracking
+  appUsageMap: Map<string, number> = new Map(); // name -> seconds
+  topAppsUsage: { name: string, time: number }[] = [];
 
   lastNetReceived = 0;
   lastNetTransmitted = 0;
@@ -141,8 +154,25 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       this.pingHistory.push(stats.ping || 0);
       this.pingHistory.shift();
 
+      this.netDownHistory.push(this.netSpeedIn);
+      this.netDownHistory.shift();
+      this.netUpHistory.push(this.netSpeedOut);
+      this.netUpHistory.shift();
+
+      this.diskReadHistory.push(stats.disk_read_speed);
+      this.diskReadHistory.shift();
+      this.diskWriteHistory.push(stats.disk_write_speed);
+      this.diskWriteHistory.shift();
+
+      // Track App Usage (Top processes in this sample)
+      stats.processes.slice(0, 10).forEach(p => {
+        const current = this.appUsageMap.get(p.name) || 0;
+        this.appUsageMap.set(p.name, current + 1);
+      });
+      this.updateAppUsageList();
+
       if (this.coreHistories.length === 0) {
-        this.coreHistories = stats.cpus.map(() => new Array(30).fill(0));
+        this.coreHistories = stats.cpus.map(() => new Array(this.HISTORY_LIMIT).fill(0));
       }
       stats.cpus.forEach((usage, i) => {
         this.coreHistories[i].push(usage);
@@ -181,7 +211,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       this.cpuChart = new Chart(this.cpuCanvas.nativeElement, {
         type: 'line',
         data: {
-          labels: new Array(30).fill(''),
+          labels: new Array(this.HISTORY_LIMIT).fill(''),
           datasets: [{
             data: this.cpuHistory,
             borderColor: '#4facfe',
@@ -232,7 +262,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       this.pingChart = new Chart(this.pingCanvas.nativeElement, {
         type: 'line',
         data: {
-          labels: new Array(30).fill(''),
+          labels: new Array(this.HISTORY_LIMIT).fill(''),
           datasets: [{
             data: this.pingHistory,
             borderColor: '#39ff14',
@@ -245,6 +275,58 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
           ...commonOptions,
           scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, max: undefined } }
         }
+      });
+    }
+
+    if (this.netTrafficCanvas) {
+      this.netTrafficChart = new Chart(this.netTrafficCanvas.nativeElement, {
+        type: 'line',
+        data: {
+          labels: new Array(this.HISTORY_LIMIT).fill(''),
+          datasets: [
+            {
+              label: 'Down',
+              data: this.netDownHistory,
+              borderColor: '#00f2fe',
+              borderWidth: 1.5,
+              fill: false,
+            },
+            {
+              label: 'Up',
+              data: this.netUpHistory,
+              borderColor: '#4facfe',
+              borderWidth: 1.5,
+              fill: false,
+            }
+          ]
+        },
+        options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, max: undefined } } }
+      });
+    }
+
+    if (this.diskIOHistoryCanvas) {
+      this.diskIOChart = new Chart(this.diskIOHistoryCanvas.nativeElement, {
+        type: 'line',
+        data: {
+          labels: new Array(this.HISTORY_LIMIT).fill(''),
+          datasets: [
+            {
+              label: 'Read',
+              data: this.diskReadHistory,
+              borderColor: '#ff5e5e',
+              borderWidth: 1.5,
+              fill: false,
+            },
+            {
+              label: 'Write',
+              data: this.diskWriteHistory,
+              borderColor: '#ffcc00',
+              borderWidth: 1.5,
+              fill: false,
+            }
+          ]
+        },
+        options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, max: undefined } } }
       });
     }
   }
@@ -296,6 +378,16 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.pingChart) {
       this.pingChart.data.datasets[0].data = [...this.pingHistory];
       this.pingChart.update();
+    }
+    if (this.netTrafficChart) {
+      this.netTrafficChart.data.datasets[0].data = [...this.netDownHistory];
+      this.netTrafficChart.data.datasets[1].data = [...this.netUpHistory];
+      this.netTrafficChart.update();
+    }
+    if (this.diskIOChart) {
+      this.diskIOChart.data.datasets[0].data = [...this.diskReadHistory];
+      this.diskIOChart.data.datasets[1].data = [...this.diskWriteHistory];
+      this.diskIOChart.update();
     }
     this.coreCharts.forEach((chart, i) => {
       if (chart) {
@@ -440,6 +532,20 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   toggleExpand(pid: number) {
     if (this.expandedParents.has(pid)) this.expandedParents.delete(pid);
     else this.expandedParents.add(pid);
+  }
+
+  updateAppUsageList() {
+    this.topAppsUsage = Array.from(this.appUsageMap.entries())
+      .map(([name, time]) => ({ name, time }))
+      .sort((a, b) => b.time - a.time)
+      .slice(0, 5);
+  }
+
+  formatDuration(seconds: number): string {
+    if (seconds < 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
   }
 
   async minimizeWindow() {

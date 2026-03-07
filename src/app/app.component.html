@@ -93,21 +93,14 @@
     <div class="stat-card net-card fade-in" *ngIf="systemStats">
       <div class="card-header">
         <span class="icon">🌐</span>
-        <h3>Network Speed</h3>
+        <h3>Network Traffic</h3>
       </div>
-      <div class="net-stats">
-        <div class="net-item">
-          <span class="direction">⏬ Download</span>
-          <span class="speed">{{ formatBytes(netSpeedIn) }}/s</span>
-        </div>
-        <div class="net-item">
-          <span class="direction">⏫ Upload</span>
-          <span class="speed">{{ formatBytes(netSpeedOut) }}/s</span>
-        </div>
+      <div class="chart-container">
+        <canvas #netTrafficCanvas></canvas>
       </div>
-      <div class="net-totals">
-        <span>Total Rx: {{ formatBytes(systemStats.net_received) }}</span>
-        <span>Total Tx: {{ formatBytes(systemStats.net_transmitted) }}</span>
+      <div class="net-stats-compact">
+        <span>⏬ {{ formatBytes(netSpeedIn) }}/s</span>
+        <span>⏫ {{ formatBytes(netSpeedOut) }}/s</span>
       </div>
     </div>
 
@@ -153,29 +146,12 @@
         <span class="icon">💾</span>
         <h3>Disk Activity</h3>
       </div>
-      <div class="disk-io-summary">
-        <div class="io-item read">
-          <span class="io-label">READ</span>
-          <span class="io-value">{{ formatBytes(systemStats.disk_read_speed) }}/s</span>
-        </div>
-        <div class="io-item write">
-          <span class="io-label">WRITE</span>
-          <span class="io-value">{{ formatBytes(systemStats.disk_write_speed) }}/s</span>
-        </div>
+      <div class="chart-container">
+        <canvas #diskIOHistoryCanvas></canvas>
       </div>
-      <div class="disk-list">
-        <div class="disk-item" *ngFor="let disk of systemStats.disks">
-          <div class="disk-info">
-            <span class="disk-name">{{ disk.name || 'Disk' }} ({{ disk.kind }})</span>
-            <span class="disk-pct">{{ getDiskUsagePercentage(disk).toFixed(0) }}%</span>
-          </div>
-          <div class="progress-bar small">
-            <div class="progress-fill" [style.width.%]="getDiskUsagePercentage(disk)"></div>
-          </div>
-          <div class="disk-space">
-            {{ formatBytes(disk.total_space - disk.available_space) }} / {{ formatBytes(disk.total_space) }}
-          </div>
-        </div>
+      <div class="disk-io-summary-compact">
+        <span class="read">R: {{ formatBytes(systemStats.disk_read_speed) }}/s</span>
+        <span class="write">W: {{ formatBytes(systemStats.disk_write_speed) }}/s</span>
       </div>
     </div>
 
@@ -183,7 +159,7 @@
     <div class="stat-card system-card fade-in" *ngIf="systemStats">
       <div class="card-header">
         <span class="icon">🛠️</span>
-        <h3>Hardware Details</h3>
+        <h3>System Info</h3>
       </div>
       <div class="system-details">
         <div class="detail-item">
@@ -191,25 +167,29 @@
           <span class="value">{{ systemStats.cpu_model }}</span>
         </div>
         <div class="detail-item">
-          <span class="label">Arch</span>
-          <span class="value">{{ systemStats.cpu_arch }} ({{ systemStats.physical_cores }}C/{{ systemStats.cpu_cores
-            }}T)</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">Speed</span>
-          <span class="value">{{ (systemStats.cpu_freq / 1000).toFixed(2) }} GHz (Current)</span>
+          <span class="label">OS</span>
+          <span class="value">{{ systemStats.os_name }} {{ systemStats.os_version }}</span>
         </div>
         <div class="detail-item">
           <span class="label">GPU</span>
           <span class="value">{{ systemStats.gpu_name }}</span>
         </div>
-        <div class="detail-item">
-          <span class="label">Total RAM</span>
-          <span class="value">{{ (systemStats.memory_total / (1024 * 1024 * 1024)).toFixed(1) }} GB</span>
-        </div>
-        <div class="detail-item" *ngIf="systemStats.battery_level !== null">
-          <span class="label">Battery</span>
-          <span class="value">{{ systemStats.battery_level.toFixed(0) }}% Health</span>
+      </div>
+    </div>
+
+    <!-- App Usage Tracking -->
+    <div class="stat-card usage-card fade-in" *ngIf="systemStats">
+      <div class="card-header">
+        <span class="icon">⏱️</span>
+        <h3>App Usage Tracking</h3>
+      </div>
+      <div class="usage-list">
+        <div class="usage-item" *ngFor="let app of topAppsUsage">
+          <span class="app-name">{{ app.name }}</span>
+          <span class="app-time">{{ formatDuration(app.time) }}</span>
+          <div class="usage-bar">
+            <div class="usage-fill" [style.width.%]="(app.time / topAppsUsage[0].time) * 100"></div>
+          </div>
         </div>
       </div>
     </div>
