@@ -499,6 +499,96 @@ h3 {
   font-family: monospace;
 }
 
+.proc-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.search-box {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.25rem 0.75rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.search-box input {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 0.75rem;
+  outline: none;
+  width: 150px;
+}
+
+.sortable {
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.sortable:hover {
+  color: var(--primary);
+}
+
+.proc-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: pre;
+  /* Essential for tree view indentation */
+}
+
+.fav-star {
+  cursor: pointer;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.2);
+  transition: transform 0.2s;
+}
+
+.fav-star:hover {
+  transform: scale(1.2);
+}
+
+.favorite .fav-star {
+  color: #ffcc00;
+}
+
+.favorite {
+  background: rgba(255, 204, 0, 0.03);
+}
+
+.kill-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: all 0.2s;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.kill-btn:hover {
+  opacity: 1;
+  background: rgba(232, 17, 35, 0.2);
+  transform: scale(1.1);
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  opacity: 0.6;
+}
+
+.icon-button.active {
+  opacity: 1;
+  filter: drop-shadow(0 0 5px var(--primary));
+}
+
 .live-indicator {
   grid-column: span 2;
   display: flex;

@@ -15,6 +15,7 @@ struct DiskInfo {
 struct ProcessInfo {
     name: String,
     pid: u32,
+    parent_pid: Option<u32>,
     cpu_usage: f32,
     memory: u64,
 }
@@ -144,6 +145,7 @@ fn get_system_stats(state: State<'_, AppState>) -> SystemStats {
             ProcessInfo {
                 name: process.name().to_string_lossy().into_owned(),
                 pid: pid.as_u32(),
+                parent_pid: process.parent().map(|p| p.as_u32()),
                 cpu_usage: process.cpu_usage(),
                 memory: process.memory(),
             }
@@ -182,12 +184,12 @@ fn get_system_stats(state: State<'_, AppState>) -> SystemStats {
     let (gpu_usage, vram_used, vram_total) = get_gpu_metrics(&gpu_name);
 
     // Sort processes
+    // Don't truncate manually here, let the frontend handle filtering/searching
     processes.sort_by(|a, b| {
         b.cpu_usage
             .partial_cmp(&a.cpu_usage)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-    processes.truncate(10);
 
     SystemStats {
         cpu_usage,
@@ -263,6 +265,20 @@ fn get_gpu_metrics(_name: &str) -> (f32, u64, u64) {
     (0.0, 0, 0)
 }
 
+#[tauri::command]
+fn kill_process(state: State<'_, AppState>, pid: u32) -> Result<(), String> {
+    let sys = state.sys.lock().unwrap();
+    if let Some(process) = sys.process(sysinfo::Pid::from(pid as usize)) {
+        if process.kill() {
+            Ok(())
+        } else {
+            Err("Failed to kill process".to_string())
+        }
+    } else {
+        Err("Process not found".to_string())
+    }
+}
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -279,7 +295,11 @@ pub fn run() {
             last_sample_time: Mutex::new(std::time::Instant::now()),
         })
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, get_system_stats])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            get_system_stats,
+            kill_process
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -214,28 +214,48 @@
       </div>
     </div>
 
-    <!-- Processes Card -->
+    <!-- Processes Card (Powerful Controller) -->
     <div class="stat-card processes-card fade-in" *ngIf="systemStats">
       <div class="card-header">
         <span class="icon">🚀</span>
-        <h3>Top Processes</h3>
+        <h3>Process Controller</h3>
+        <div class="proc-actions">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" placeholder="Search by name or PID..." (input)="onSearch($event)">
+          </div>
+          <button class="icon-button" [class.active]="showTree" (click)="toggleTree()"
+            title="Toggle Tree View">🌳</button>
+        </div>
       </div>
       <div class="process-list">
         <table>
           <thead>
             <tr>
-              <th>Process</th>
-              <th>PID</th>
-              <th>CPU%</th>
-              <th>Memory</th>
+              <th (click)="setSort('name')" class="sortable">Process <span
+                  *ngIf="sortKey==='name'">{{sortDir==='asc'?'↑':'↓'}}</span></th>
+              <th (click)="setSort('pid')" class="sortable">PID <span
+                  *ngIf="sortKey==='pid'">{{sortDir==='asc'?'↑':'↓'}}</span></th>
+              <th (click)="setSort('cpu_usage')" class="sortable">CPU% <span
+                  *ngIf="sortKey==='cpu_usage'">{{sortDir==='asc'?'↑':'↓'}}</span></th>
+              <th (click)="setSort('memory')" class="sortable">RAM <span
+                  *ngIf="sortKey==='memory'">{{sortDir==='asc'?'↑':'↓'}}</span></th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let proc of systemStats.processes">
-              <td class="proc-name">{{ proc.name }}</td>
+            <tr *ngFor="let proc of filteredProcesses" [class.favorite]="favorites.has(proc.pid)">
+              <td class="proc-name">
+                <span class="fav-star" (click)="toggleFavorite(proc.pid)">{{ favorites.has(proc.pid) ? '⭐' : '☆'
+                  }}</span>
+                <span class="name-text">{{ proc.name }}</span>
+              </td>
               <td class="proc-pid">{{ proc.pid }}</td>
               <td class="proc-cpu">{{ proc.cpu_usage.toFixed(1) }}%</td>
               <td class="proc-mem">{{ formatBytes(proc.memory) }}</td>
+              <td class="proc-ops">
+                <button class="kill-btn" (click)="killProcess(proc.pid)" title="End Task">❌</button>
+              </td>
             </tr>
           </tbody>
         </table>

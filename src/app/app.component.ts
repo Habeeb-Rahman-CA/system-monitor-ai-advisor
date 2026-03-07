@@ -18,9 +18,14 @@ interface DiskInfo {
 interface ProcessInfo {
   name: string;
   pid: number;
+  parent_pid: number | null;
   cpu_usage: number;
   memory: number;
+  isFavorite?: boolean;
+  isExpanded?: boolean;
 }
+
+type ProcessSortKey = 'name' | 'cpu_usage' | 'memory' | 'pid';
 
 interface SystemStats {
   cpu_usage: number;
@@ -84,6 +89,14 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   lastNetTransmitted = 0;
   netSpeedIn = 0; // Bytes per second
   netSpeedOut = 0; // Bytes per second
+
+  // Process Management State
+  searchTerm = '';
+  sortKey: ProcessSortKey = 'cpu_usage';
+  sortDir: 'asc' | 'desc' = 'desc';
+  favorites: Set<number> = new Set();
+  expandedParents: Set<number> = new Set();
+  showTree = false;
 
   ngOnInit() {
     this.interval = setInterval(() => {
@@ -321,6 +334,112 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  }
+
+  // --- Process Management Methods ---
+
+  get filteredProcesses(): ProcessInfo[] {
+    if (!this.systemStats) return [];
+
+    let list = this.systemStats.processes.map(p => ({
+      ...p,
+      isFavorite: this.favorites.has(p.pid)
+    }));
+
+    // Search filter
+    if (this.searchTerm) {
+      const term = this.searchTerm.toLowerCase();
+      list = list.filter(p => p.name.toLowerCase().includes(term) || p.pid.toString().includes(term));
+    }
+
+    // Sort
+    list.sort((a, b) => {
+      // Favorites always on top
+      if (a.isFavorite && !b.isFavorite) return -1;
+      if (!a.isFavorite && b.isFavorite) return 1;
+
+      let valA = a[this.sortKey] as any;
+      let valB = b[this.sortKey] as any;
+
+      if (typeof valA === 'string') {
+        valA = valA.toLowerCase();
+        valB = (valB as string).toLowerCase();
+      }
+
+      if (valA < valB) return this.sortDir === 'asc' ? -1 : 1;
+      if (valA > valB) return this.sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    if (this.showTree && !this.searchTerm) {
+      return this.buildProcessTree(list);
+    }
+
+    return list.slice(0, 50); // Show top 50
+  }
+
+  private buildProcessTree(list: ProcessInfo[]): ProcessInfo[] {
+    const tree: ProcessInfo[] = [];
+    const map = new Map<number, ProcessInfo[]>();
+
+    list.forEach(p => {
+      const parentId = p.parent_pid || 0;
+      if (!map.has(parentId)) map.set(parentId, []);
+      map.get(parentId)!.push(p);
+    });
+
+    const addChildren = (parentId: number, depth: number) => {
+      const children = map.get(parentId);
+      if (children) {
+        children.forEach(child => {
+          tree.push({ ...child, name: ' '.repeat(depth * 3) + (depth > 0 ? '┗ ' : '') + child.name });
+          if (this.expandedParents.has(child.pid)) {
+            addChildren(child.pid, depth + 1);
+          }
+        });
+      }
+    };
+
+    addChildren(0, 0); // Start from roots
+    return tree.slice(0, 50);
+  }
+
+  toggleFavorite(pid: number) {
+    if (this.favorites.has(pid)) this.favorites.delete(pid);
+    else this.favorites.add(pid);
+  }
+
+  async killProcess(pid: number) {
+    if (confirm(`Kill process ${pid}?`)) {
+      try {
+        await invoke('kill_process', { pid });
+        this.fetchStats(); // Refresh immediately
+      } catch (e) {
+        alert("Failed to kill process: " + e);
+      }
+    }
+  }
+
+  setSort(key: ProcessSortKey) {
+    if (this.sortKey === key) {
+      this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortKey = key;
+      this.sortDir = 'desc';
+    }
+  }
+
+  onSearch(event: any) {
+    this.searchTerm = event.target.value;
+  }
+
+  toggleTree() {
+    this.showTree = !this.showTree;
+  }
+
+  toggleExpand(pid: number) {
+    if (this.expandedParents.has(pid)) this.expandedParents.delete(pid);
+    else this.expandedParents.add(pid);
   }
 
   async minimizeWindow() {
