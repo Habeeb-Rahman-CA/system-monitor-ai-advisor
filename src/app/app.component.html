@@ -1,0 +1,50 @@
+<main class="system-monitor-container">
+  <header>
+    <h1>System Monitor</h1>
+    <div class="os-badge" *ngIf="systemStats">
+      <span class="os-icon">🖥️</span>
+      <span class="os-info">{{ systemStats.os_name }} {{ systemStats.os_version }}</span>
+    </div>
+  </header>
+
+  <section class="stats-grid" *ngIf="systemStats">
+    <!-- CPU Card -->
+    <div class="stat-card cpu-card fade-in">
+      <div class="card-header">
+        <span class="icon">⚡</span>
+        <h3>CPU Usage</h3>
+        <span class="percentage">{{ systemStats.cpu_usage.toFixed(1) }}%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="systemStats.cpu_usage"></div>
+      </div>
+    </div>
+
+    <!-- RAM Card -->
+    <div class="stat-card ram-card fade-in">
+      <div class="card-header">
+        <span class="icon">🧠</span>
+        <h3>RAM Usage</h3>
+        <span class="percentage">{{ getMemoryPercentage().toFixed(1) }}%</span>
+      </div>
+      <div class="memory-details">
+        <span>{{ formatBytes(systemStats.memory_used) }} occupied</span>
+        <span>{{ formatBytes(systemStats.memory_total) }} total</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="getMemoryPercentage()"></div>
+      </div>
+    </div>
+
+    <!-- Live Status -->
+    <div class="live-indicator">
+      <span class="dot pulse"></span>
+      Live Updates Enabled
+    </div>
+  </section>
+
+  <section class="loading" *ngIf="!systemStats">
+    <div class="spinner"></div>
+    <p>Initializing System Monitor...</p>
+  </section>
+</main>
