@@ -2,6 +2,9 @@ import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit, Vie
 import { CommonModule } from "@angular/common";
 import { invoke } from "@tauri-apps/api/core";
 import { Chart, registerables } from 'chart.js';
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
+const appWindow = getCurrentWindow();
 
 Chart.register(...registerables);
 
@@ -9,6 +12,7 @@ interface DiskInfo {
   name: string;
   total_space: number;
   available_space: number;
+  kind: string;
 }
 
 interface ProcessInfo {
@@ -21,6 +25,10 @@ interface ProcessInfo {
 interface SystemStats {
   cpu_usage: number;
   cpu_cores: number;
+  physical_cores: number;
+  cpu_model: string;
+  cpu_arch: string;
+  cpu_freq: number;
   cpus: number[];
   cpu_temp: number | null;
   memory_used: number;
@@ -32,6 +40,8 @@ interface SystemStats {
   net_received: number;
   net_transmitted: number;
   processes: ProcessInfo[];
+  gpu_name: string;
+  battery_level: number | null;
 }
 
 @Component({
@@ -247,5 +257,17 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  }
+
+  async minimizeWindow() {
+    await appWindow.minimize();
+  }
+
+  async toggleMaximize() {
+    await appWindow.toggleMaximize();
+  }
+
+  async closeWindow() {
+    await appWindow.close();
   }
 }

@@ -1,27 +1,47 @@
-<main class="system-monitor-container">
-  <header>
-    <div class="header-main">
-      <h1>System Monitor</h1>
-      <div class="os-badge" *ngIf="systemStats">
-        <span class="os-icon">🖥️</span>
-        <span class="os-info">{{ systemStats.os_name }} {{ systemStats.os_version }}</span>
+<div class="dashboard-container">
+  <div data-tauri-drag-region class="titlebar">
+    <div class="titlebar-logo">🛰️</div>
+    <div class="titlebar-text">System Monitor</div>
+    <div class="window-controls">
+      <div class="window-button minimize" (click)="minimizeWindow()">
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <rect fill="currentColor" x="2" y="5.5" width="8" height="1"></rect>
+        </svg>
+      </div>
+      <div class="window-button maximize" (click)="toggleMaximize()">
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <rect fill="none" stroke="currentColor" x="2.5" y="2.5" width="7" height="7"></rect>
+        </svg>
+      </div>
+      <div class="window-button close" (click)="closeWindow()">
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <path fill="currentColor" d="M10.5 1.5l-9 9m0-9l9 9" stroke="currentColor" stroke-width="1.2"></path>
+        </svg>
       </div>
     </div>
-    <div class="header-badges" *ngIf="systemStats">
-      <div class="mini-badge">
-        <span class="label">UPTIME:</span>
-        <span class="value">{{ formatUptime(systemStats.uptime) }}</span>
-      </div>
-      <div class="mini-badge">
-        <span class="label">CORES:</span>
-        <span class="value">{{ systemStats.cpu_cores }}</span>
-      </div>
+  </div>
+  <div class="top-bar" *ngIf="systemStats">
+    <div class="app-info">
+      <div class="app-logo">🛰️</div>
+      <h1>System<span>Monitor</span></h1>
     </div>
-  </header>
+
+    <div class="sys-meta">
+      <div class="meta-item">
+        <span class="meta-label">OS</span>
+        <span class="meta-value">{{ systemStats.os_name }}</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">UPTIME</span>
+        <span class="meta-value">{{ formatUptime(systemStats.uptime) }}</span>
+      </div>
+      <div class="live-dot pulse"></div>
+    </div>
+  </div>
 
   <section class="stats-grid" *ngIf="systemStats">
     <!-- CPU Card -->
-    <div class="stat-card cpu-card fade-in">
+    <div class="stat-card cpu-card fade-in" *ngIf="systemStats">
       <div class="card-header">
         <span class="icon">⚡</span>
         <h3>CPU History</h3>
@@ -36,7 +56,7 @@
     </div>
 
     <!-- Per-Core Grid (New) -->
-    <div class="stat-card cores-card fade-in">
+    <div class="stat-card cores-card fade-in" *ngIf="systemStats">
       <div class="card-header">
         <span class="icon">🚥</span>
         <h3>Per-Core Activity</h3>
@@ -55,7 +75,7 @@
     </div>
 
     <!-- RAM Card -->
-    <div class="stat-card ram-card fade-in">
+    <div class="stat-card ram-card fade-in" *ngIf="systemStats">
       <div class="card-header">
         <span class="icon">🧠</span>
         <h3>Memory History</h3>
@@ -70,7 +90,7 @@
     </div>
 
     <!-- Network Card -->
-    <div class="stat-card net-card fade-in">
+    <div class="stat-card net-card fade-in" *ngIf="systemStats">
       <div class="card-header">
         <span class="icon">🌐</span>
         <h3>Network Speed</h3>
@@ -92,7 +112,7 @@
     </div>
 
     <!-- Disk Card -->
-    <div class="stat-card disk-card fade-in">
+    <div class="stat-card disk-card fade-in" *ngIf="systemStats">
       <div class="card-header">
         <span class="icon">💾</span>
         <h3>Disk Usage</h3>
@@ -100,21 +120,56 @@
       <div class="disk-list">
         <div class="disk-item" *ngFor="let disk of systemStats.disks">
           <div class="disk-info">
-            <span class="disk-name">{{ disk.name || 'Local Disk' }}</span>
+            <span class="disk-name">{{ disk.name || 'Disk' }} ({{ disk.kind }})</span>
             <span class="disk-pct">{{ getDiskUsagePercentage(disk).toFixed(0) }}%</span>
           </div>
           <div class="progress-bar small">
             <div class="progress-fill" [style.width.%]="getDiskUsagePercentage(disk)"></div>
           </div>
           <div class="disk-space">
-            {{ formatBytes(disk.total_space - disk.available_space) }} used of {{ formatBytes(disk.total_space) }}
+            {{ formatBytes(disk.total_space - disk.available_space) }} / {{ formatBytes(disk.total_space) }}
           </div>
         </div>
       </div>
     </div>
 
+    <!-- Hardware Details Card -->
+    <div class="stat-card system-card fade-in" *ngIf="systemStats">
+      <div class="card-header">
+        <span class="icon">🛠️</span>
+        <h3>Hardware Details</h3>
+      </div>
+      <div class="system-details">
+        <div class="detail-item">
+          <span class="label">CPU</span>
+          <span class="value">{{ systemStats.cpu_model }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Arch</span>
+          <span class="value">{{ systemStats.cpu_arch }} ({{ systemStats.physical_cores }}C/{{ systemStats.cpu_cores
+            }}T)</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Speed</span>
+          <span class="value">{{ (systemStats.cpu_freq / 1000).toFixed(2) }} GHz (Current)</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">GPU</span>
+          <span class="value">{{ systemStats.gpu_name }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Total RAM</span>
+          <span class="value">{{ (systemStats.memory_total / (1024 * 1024 * 1024)).toFixed(1) }} GB</span>
+        </div>
+        <div class="detail-item" *ngIf="systemStats.battery_level !== null">
+          <span class="label">Battery</span>
+          <span class="value">{{ systemStats.battery_level.toFixed(0) }}% Health</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Processes Card -->
-    <div class="stat-card processes-card fade-in">
+    <div class="stat-card processes-card fade-in" *ngIf="systemStats">
       <div class="card-header">
         <span class="icon">🚀</span>
         <h3>Top Processes</h3>
@@ -152,4 +207,4 @@
     <div class="spinner"></div>
     <p>Loading Deep Systems Data...</p>
   </section>
-</main>
+</div>

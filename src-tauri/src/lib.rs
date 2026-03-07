@@ -8,6 +8,7 @@ struct DiskInfo {
     name: String,
     total_space: u64,
     available_space: u64,
+    kind: String,
 }
 
 #[derive(Serialize)]
@@ -22,6 +23,10 @@ struct ProcessInfo {
 struct SystemStats {
     cpu_usage: f32,
     cpu_cores: usize,
+    physical_cores: usize,
+    cpu_model: String,
+    cpu_arch: String,
+    cpu_freq: u64,
     cpus: Vec<f32>,
     cpu_temp: Option<f32>,
     memory_used: u64,
@@ -33,6 +38,8 @@ struct SystemStats {
     net_received: u64,
     net_transmitted: u64,
     processes: Vec<ProcessInfo>,
+    gpu_name: String,
+    battery_level: Option<f32>,
 }
 
 pub struct AppState {
@@ -49,13 +56,22 @@ fn get_system_stats(state: State<'_, AppState>) -> SystemStats {
 
     let cpu_usage = sys.global_cpu_usage();
     let cpu_cores = sys.cpus().len();
+    let physical_cores = sys.physical_core_count().unwrap_or(cpu_cores);
+    let cpu_model = sys
+        .cpus()
+        .get(0)
+        .map(|c| c.brand().to_string())
+        .unwrap_or_else(|| "Unknown".to_string());
+    let cpu_arch = System::cpu_arch();
+    let cpu_freq = sys.cpus().get(0).map(|c| c.frequency()).unwrap_or(0);
+
     let memory_used = sys.used_memory();
     let memory_total = sys.total_memory();
     let os_name = System::name().unwrap_or_else(|| "Unknown".to_string());
     let os_version = System::os_version().unwrap_or_else(|| "Unknown".to_string());
     let uptime = System::uptime();
 
-    // Disks metrics (separate struct in sysinfo 0.33)
+    // Disks metrics
     let disks_info = Disks::new_with_refreshed_list();
     let disks = disks_info
         .iter()
@@ -63,10 +79,11 @@ fn get_system_stats(state: State<'_, AppState>) -> SystemStats {
             name: disk.name().to_string_lossy().into_owned(),
             total_space: disk.total_space(),
             available_space: disk.available_space(),
+            kind: format!("{:?}", disk.kind()),
         })
         .collect();
 
-    // Network metrics (separate struct in sysinfo 0.33)
+    // Network metrics
     let networks = Networks::new_with_refreshed_list();
     let mut net_received = 0;
     let mut net_transmitted = 0;
@@ -79,11 +96,32 @@ fn get_system_stats(state: State<'_, AppState>) -> SystemStats {
 
     let components = Components::new_with_refreshed_list();
     let mut cpu_temp = None;
+    let mut battery_level = None;
+    let mut gpu_name = "Integrated/N/A".to_string();
+
     for c in &components {
         let label = c.label().to_lowercase();
-        if label.contains("cpu") || label.contains("package") || label.contains("core") {
+        // Temperature check
+        if cpu_temp.is_none()
+            && (label.contains("cpu") || label.contains("package") || label.contains("core"))
+        {
             cpu_temp = c.temperature();
-            break;
+        }
+
+        // Battery check
+        if label.contains("battery") {
+            // Components often store current capacity or level in some forms
+            // sysinfo doesn't directly expose level, but sometimes temperature or other things
+            // We'll leave it as None if not found
+        }
+
+        // GPU check in components
+        if label.contains("gpu")
+            || label.contains("nvidia")
+            || label.contains("amd")
+            || label.contains("intel hd")
+        {
+            gpu_name = c.label().to_string();
         }
     }
 
@@ -112,6 +150,10 @@ fn get_system_stats(state: State<'_, AppState>) -> SystemStats {
     SystemStats {
         cpu_usage,
         cpu_cores,
+        physical_cores,
+        cpu_model,
+        cpu_arch,
+        cpu_freq,
         cpus,
         cpu_temp,
         memory_used,
@@ -123,6 +165,8 @@ fn get_system_stats(state: State<'_, AppState>) -> SystemStats {
         net_received,
         net_transmitted,
         processes,
+        gpu_name,
+        battery_level,
     }
 }
 
