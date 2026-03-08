@@ -671,6 +671,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   setMgmtSubTab(subTab: 'services' | 'startup') {
     this.mgmtSubTab = subTab;
+    this.refreshManagementData();
   }
 
   // --- Reports & Exports ---
@@ -807,8 +808,10 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     this.isLoadingMgmt = true;
     try {
       if (this.mgmtSubTab === 'services') {
+        this.services = []; // Clear current to show loader
         this.services = await invoke<ServiceInfo[]>('get_services');
       } else {
+        this.startupApps = []; // Clear current to show loader
         this.startupApps = await invoke<StartupInfo[]>('get_startup_apps');
       }
       this.lastMgmtRefresh = Date.now();

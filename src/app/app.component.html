@@ -489,7 +489,11 @@
 
         <!-- Services List -->
         <div class="mgmt-card fade-in" *ngIf="mgmtSubTab === 'services'">
-          <table class="mgmt-table">
+          <div class="loading" *ngIf="isLoadingMgmt && services.length === 0">
+            <div class="spinner"></div>
+            <p>Fetching Windows Services...</p>
+          </div>
+          <table class="mgmt-table" *ngIf="!isLoadingMgmt || services.length > 0">
             <thead>
               <tr>
                 <th>Service Name</th>
@@ -520,7 +524,11 @@
 
         <!-- Startup Apps List -->
         <div class="mgmt-card fade-in" *ngIf="mgmtSubTab === 'startup'">
-          <table class="mgmt-table">
+          <div class="loading" *ngIf="isLoadingMgmt && startupApps.length === 0">
+            <div class="spinner"></div>
+            <p>Fetching Startup applications...</p>
+          </div>
+          <table class="mgmt-table" *ngIf="!isLoadingMgmt || startupApps.length > 0">
             <thead>
               <tr>
                 <th>App Name</th>
