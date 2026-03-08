@@ -16,7 +16,7 @@
         "title": "system-monitor",
         "width": 1000,
         "height": 800,
-        "transparent": true,
+        "transparent": false,
         "decorations": false
       }
     ],
