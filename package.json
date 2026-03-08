@@ -16,6 +16,8 @@
     "@angular/forms": "^20.1.4",
     "@angular/platform-browser": "^20.1.4",
     "@angular/router": "^20.1.4",
+    "@huggingface/hub": "^2.10.5",
+    "@mlc-ai/web-llm": "^0.2.81",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "chart.js": "^4.5.1",

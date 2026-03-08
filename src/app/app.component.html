@@ -100,6 +100,17 @@
       <button class="advisor-close" (click)="toggleAdvisor()"><i class="ri-close-line"></i></button>
     </div>
 
+    <!-- Mode Switcher -->
+    <div class="advisor-mode-tabs">
+      <button class="mode-tab" [class.active]="advisorMode === 'rule'" (click)="setAdvisorMode('rule')">
+        <i class="ri-shield-check-line"></i> Rule-Based
+      </button>
+      <button class="mode-tab" [class.active]="advisorMode === 'llm'" (click)="setAdvisorMode('llm')">
+        <i class="ri-sparkling-2-line"></i> Local AI
+        <span class="llm-badge" *ngIf="llmStatus === 'ready'">Online</span>
+      </button>
+    </div>
+
     <!-- Health Score Ring -->
     <div class="advisor-score-section">
       <div class="score-ring-wrap">
@@ -117,8 +128,67 @@
       <div class="score-meta">
         <div class="score-status" [style.color]="getAdvisorScoreColor()">{{ getAdvisorScoreLabel() }}</div>
         <div class="score-desc">System Health Score</div>
-        <button class="refresh-btn" (click)="systemStats && runAdvisor(systemStats)"><i class="ri-refresh-line"></i>
-          Refresh</button>
+        <button class="refresh-btn"
+          (click)="advisorMode==='rule' ? (systemStats && runAdvisor(systemStats)) : (systemStats && runLLMAdvisor(systemStats))"
+          [disabled]="llmStatus === 'loading' || llmStatus === 'thinking'">
+          <i class="ri-refresh-line"></i> Refresh</button>
+      </div>
+    </div>
+
+    <!-- LLM Controls (only when LLM mode is active) -->
+    <div class="llm-controls" *ngIf="advisorMode === 'llm'">
+
+      <!-- Model selector (only when idle or error) -->
+      <div class="llm-model-row" *ngIf="llmStatus === 'idle' || llmStatus === 'error'">
+        <label class="llm-label"><i class="ri-cpu-line"></i> Model</label>
+        <select class="llm-select" [(ngModel)]="selectedModel">
+          <option *ngFor="let m of AVAILABLE_MODELS" [value]="m.id">{{ m.label }}</option>
+        </select>
+        <button class="llm-load-btn" (click)="loadLLM()">
+          <i class="ri-download-cloud-line"></i> Load Model
+        </button>
+      </div>
+
+      <!-- Loading progress -->
+      <div class="llm-loading-section" *ngIf="llmStatus === 'loading'">
+        <div class="llm-progress-label">
+          <i class="ri-loader-4-line spin"></i>
+          <span>{{ llmProgressText || 'Loading model…' }}</span>
+        </div>
+        <div class="llm-progress-bar">
+          <div class="llm-progress-fill" [style.width.%]="llmProgress"></div>
+        </div>
+        <div class="llm-progress-pct">{{ llmProgress }}%</div>
+      </div>
+
+      <!-- Ready / Thinking state -->
+      <div class="llm-ready-row" *ngIf="llmStatus === 'ready' || llmStatus === 'thinking'">
+        <div class="llm-model-badge">
+          <i class="ri-sparkling-2-line"></i>
+          <span>{{ getSelectedModelLabel() }}</span>
+          <span class="llm-tag" [class.thinking]="llmStatus === 'thinking'">{{ llmStatus === 'thinking' ? 'Thinking…' :
+            'Online' }}</span>
+        </div>
+        <button class="llm-unload-btn" (click)="unloadLLM()" title="Unload model">
+          <i class="ri-stop-circle-line"></i>
+        </button>
+      </div>
+
+      <!-- LLM streaming response preview -->
+      <div class="llm-stream-preview" *ngIf="llmStatus === 'thinking' && llmResponse">
+        <div class="stream-text">{{ llmResponse }}</div>
+      </div>
+
+      <!-- Error -->
+      <div class="llm-error" *ngIf="llmStatus === 'error'">
+        <i class="ri-error-warning-line"></i>
+        <span>{{ llmError }}</span>
+      </div>
+
+      <!-- Info note for first load -->
+      <div class="llm-info-note" *ngIf="llmStatus === 'idle'">
+        <i class="ri-information-line"></i>
+        Models download once then run <strong>100% offline</strong>. Requires WebGPU support.
       </div>
     </div>
 
@@ -135,15 +205,25 @@
         </div>
         <div class="advice-severity-dot" [class]="advice.severity"></div>
       </div>
-      <div class="advice-empty" *ngIf="advices.length === 0">
+      <div class="advice-empty" *ngIf="advices.length === 0 && advisorMode === 'rule'">
         <div class="empty-spinner"></div>
         <p>Analyzing system...</p>
+      </div>
+      <div class="advice-empty"
+        *ngIf="advices.length === 0 && advisorMode === 'llm' && (llmStatus === 'idle' || llmStatus === 'loading')">
+        <i class="ri-robot-2-line" style="font-size:2rem;opacity:0.3"></i>
+        <p>Load a model above to get AI-powered insights</p>
       </div>
     </div>
 
     <div class="advisor-footer">
-      <span>Updates every 10 seconds</span>
+      <span *ngIf="advisorMode === 'rule'"><i class="ri-shield-check-line"></i> Rule-based · Updates every 10s</span>
+      <span *ngIf="advisorMode === 'llm' && llmStatus === 'ready'"><i class="ri-sparkling-2-line"></i> Local LLM · Fully
+        offline</span>
+      <span *ngIf="advisorMode === 'llm' && llmStatus !== 'ready'"><i class="ri-sparkling-2-line"></i> Local AI
+        Mode</span>
     </div>
+
   </div>
 
   <!-- Advisor backdrop -->

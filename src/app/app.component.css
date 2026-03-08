@@ -1750,3 +1750,299 @@ h3 {
   align-items: center;
   gap: 1rem;
 }
+
+/* ── Advisor Mode Tabs ───────────────────────────────────── */
+.advisor-mode-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 0 1rem 0;
+}
+
+.mode-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.mode-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.mode-tab:hover:not(.active) {
+  color: #fff;
+}
+
+.llm-badge {
+  background: #00ff88;
+  color: #000;
+  font-size: 0.55rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 10px;
+  letter-spacing: 0.5px;
+  margin-left: 2px;
+}
+
+/* ── LLM Controls Section ───────────────────────────────── */
+.llm-controls {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.llm-model-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.llm-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.llm-select {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.llm-select option {
+  background: #0d0d1a;
+  color: #fff;
+}
+
+.llm-load-btn {
+  width: 100%;
+  padding: 0.6rem;
+  background: linear-gradient(135deg, var(--primary), #7b5ea7);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.78rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: all 0.25s ease;
+}
+
+.llm-load-btn:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 0 18px rgba(79, 172, 254, 0.35);
+}
+
+/* Loading progress */
+.llm-loading-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.llm-progress-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.llm-progress-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.llm-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), #7b5ea7);
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px var(--primary);
+}
+
+.llm-progress-pct {
+  font-size: 0.65rem;
+  color: var(--primary);
+  font-weight: 700;
+  font-family: monospace;
+  text-align: right;
+}
+
+/* Ready / Thinking row */
+.llm-ready-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.llm-model-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  color: #fff;
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.llm-model-badge i {
+  color: var(--primary);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.llm-model-badge span:first-of-type {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.llm-tag {
+  background: rgba(0, 255, 136, 0.12);
+  color: #00ff88;
+  font-size: 0.6rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 255, 136, 0.25);
+}
+
+.llm-tag.thinking {
+  background: rgba(255, 204, 0, 0.12);
+  color: #ffcc00;
+  border-color: rgba(255, 204, 0, 0.25);
+  animation: blink 1.2s ease infinite;
+}
+
+@keyframes blink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.llm-unload-btn {
+  background: rgba(255, 75, 43, 0.1);
+  border: 1px solid rgba(255, 75, 43, 0.25);
+  color: #ff4b2b;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.llm-unload-btn:hover {
+  background: rgba(255, 75, 43, 0.2);
+}
+
+/* Streaming preview */
+.llm-stream-preview {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  max-height: 80px;
+  overflow: hidden;
+  position: relative;
+}
+
+.llm-stream-preview::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.5));
+}
+
+.stream-text {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Error display */
+.llm-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  background: rgba(255, 75, 43, 0.08);
+  border: 1px solid rgba(255, 75, 43, 0.2);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.7rem;
+  color: #ff6b6b;
+  line-height: 1.4;
+}
+
+/* Info note for LLM */
+.llm-info-note {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  line-height: 1.4;
+}
+
+.llm-info-note i {
+  flex-shrink: 0;
+  color: var(--primary);
+}
+
+/* Spin animation */
+.spin {
+  animation: spin 1s linear infinite;
+}

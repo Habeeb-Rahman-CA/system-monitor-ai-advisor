@@ -1,10 +1,13 @@
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit, ViewChildren, QueryList } from "@angular/core";
 import { CommonModule } from "@angular/common";
+import { FormsModule } from "@angular/forms";
 import { invoke } from "@tauri-apps/api/core";
 import { Chart, registerables } from 'chart.js';
 import { getCurrentWindow, PhysicalSize } from "@tauri-apps/api/window";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+// web-llm is loaded lazily on demand to avoid crash at startup
+type WebLLMModule = typeof import('@mlc-ai/web-llm');
 
 const appWindow = getCurrentWindow();
 
@@ -90,7 +93,7 @@ interface SystemStats {
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: "./app.component.html",
   styleUrl: "./app.component.css",
 })
@@ -176,6 +179,23 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   advices: Advice[] = [];
   advisorLastRun = 0;
   advisorScore = 100; // 0–100 health score
+
+  // LLM Advisor State
+  advisorMode: 'rule' | 'llm' = 'rule'; // which mode is active
+  llmEngine: any | null = null; // MLCEngine – typed as any since we use dynamic import
+  llmStatus: 'idle' | 'loading' | 'ready' | 'thinking' | 'error' = 'idle';
+  llmProgress = 0; // 0–100 load progress
+  llmProgressText = '';
+  llmError = '';
+  llmResponse = ''; // raw streaming response
+  selectedModel = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
+  readonly AVAILABLE_MODELS = [
+    { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', label: 'LLaMA 3.2 1B (Fast, ~0.6 GB)' },
+    { id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC', label: 'LLaMA 3.2 3B (Smarter, ~1.8 GB)' },
+    { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC', label: 'Phi 3.5 Mini (Balanced, ~2.0 GB)' },
+    { id: 'gemma-2-2b-it-q4f16_1-MLC', label: 'Gemma 2 2B (Google, ~1.5 GB)' },
+    { id: 'Mistral-7B-Instruct-v0.3-q4f16_1-MLC', label: 'Mistral 7B (Powerful, ~4.0 GB)' },
+  ];
 
   // Customizable Dashboard (Widget Visibility)
   widgetVisibility = {
@@ -1001,8 +1021,147 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   toggleAdvisor() {
     this.isAdvisorOpen = !this.isAdvisorOpen;
     if (this.isAdvisorOpen && this.systemStats) {
+      // Always run the rule-based analysis on open so score is fresh
       this.runAdvisor(this.systemStats);
     }
+  }
+
+  setAdvisorMode(mode: 'rule' | 'llm') {
+    this.advisorMode = mode;
+    if (mode === 'rule' && this.systemStats) {
+      this.runAdvisor(this.systemStats);
+    }
+  }
+
+  async loadLLM() {
+    if (this.llmStatus === 'loading' || this.llmStatus === 'ready') return;
+    this.llmStatus = 'loading';
+    this.llmProgress = 0;
+    this.llmProgressText = 'Initialising engine…';
+    this.llmError = '';
+    try {
+      // Dynamically import web-llm only when user requests it
+      const webllm: WebLLMModule = await import('@mlc-ai/web-llm');
+      const engine = await webllm.CreateMLCEngine(
+        this.selectedModel,
+        {
+          initProgressCallback: (prog: any) => {
+            this.llmProgress = Math.round(prog.progress * 100);
+            this.llmProgressText = prog.text;
+          }
+        }
+      );
+      this.llmEngine = engine;
+      this.llmStatus = 'ready';
+      this.llmProgressText = 'Model loaded and ready!';
+      // Immediately run LLM advice if stats available
+      if (this.systemStats) await this.runLLMAdvisor(this.systemStats);
+    } catch (err: any) {
+      this.llmStatus = 'error';
+      this.llmError = err?.message ?? String(err);
+    }
+  }
+
+  unloadLLM() {
+    if (this.llmEngine) {
+      this.llmEngine.unload();
+      this.llmEngine = null;
+    }
+    this.llmStatus = 'idle';
+    this.llmProgress = 0;
+    this.llmProgressText = '';
+    this.llmError = '';
+    this.llmResponse = '';
+  }
+
+  async runLLMAdvisor(stats: SystemStats) {
+    if (!this.llmEngine || this.llmStatus !== 'ready') return;
+    this.llmStatus = 'thinking';
+    this.llmResponse = '';
+
+    const ramPct = ((stats.memory_used / stats.memory_total) * 100).toFixed(1);
+    const diskInfo = stats.disks.map(d =>
+      `${d.name}: ${((1 - d.available_space / d.total_space) * 100).toFixed(1)}% used`
+    ).join(', ');
+
+    const prompt = `You are a system performance advisor. Analyze these real-time metrics and give 3-5 concise, actionable performance tips. Format each tip as a bullet point starting with a severity tag [CRITICAL], [WARNING], [INFO], or [OK].
+
+System Metrics:
+- CPU Usage: ${stats.cpu_usage.toFixed(1)}% (${stats.physical_cores} physical cores, ${stats.cpu_model})
+- RAM Usage: ${ramPct}% (${this.formatBytes(stats.memory_used)} / ${this.formatBytes(stats.memory_total)})
+- GPU Usage: ${stats.gpu_usage.toFixed(1)}% (${stats.gpu_name})
+- Disk: ${diskInfo || 'N/A'}
+- Network: ↓${this.formatBytes(this.netSpeedIn)}/s  ↑${this.formatBytes(this.netSpeedOut)}/s
+- Ping: ${stats.ping}ms
+- CPU Temp: ${stats.cpu_temp !== null ? stats.cpu_temp + '°C' : 'N/A'}
+- Top processes: ${stats.processes.slice(0, 5).map(p => `${p.name}(${p.cpu_usage.toFixed(1)}%CPU)`).join(', ')}
+
+Provide only the bullet points, no preamble.`;
+
+    try {
+      const chunks = await this.llmEngine.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        stream: true,
+        temperature: 0.3,
+        max_tokens: 512,
+      });
+
+      let full = '';
+      for await (const chunk of chunks) {
+        const delta = chunk.choices[0]?.delta?.content ?? '';
+        full += delta;
+        this.llmResponse = full;
+      }
+
+      // Parse LLM response into Advice cards
+      this.advices = this.parseLLMResponse(full);
+      this.llmStatus = 'ready';
+    } catch (err: any) {
+      this.llmStatus = 'error';
+      this.llmError = err?.message ?? String(err);
+    }
+  }
+
+  parseLLMResponse(text: string): Advice[] {
+    const lines = text.split('\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('•') || l.trim().match(/^\[/));
+    const advices: Advice[] = [];
+    for (const line of lines) {
+      const clean = line.replace(/^[-•*]\s*/, '').trim();
+      let severity: Advice['severity'] = 'info';
+      let icon = 'ri-information-line';
+      let body = clean;
+
+      if (/\[CRITICAL\]/i.test(clean)) {
+        severity = 'critical'; icon = 'ri-error-warning-fill';
+        body = clean.replace(/\[CRITICAL\]/i, '').trim();
+      } else if (/\[WARNING\]/i.test(clean)) {
+        severity = 'warning'; icon = 'ri-alert-line';
+        body = clean.replace(/\[WARNING\]/i, '').trim();
+      } else if (/\[OK\]/i.test(clean)) {
+        severity = 'good'; icon = 'ri-thumb-up-line';
+        body = clean.replace(/\[OK\]/i, '').trim();
+      } else if (/\[INFO\]/i.test(clean)) {
+        icon = 'ri-information-line';
+        body = clean.replace(/\[INFO\]/i, '').trim();
+      }
+
+      const colonIdx = body.indexOf(':');
+      const title = colonIdx > 0 && colonIdx < 40 ? body.substring(0, colonIdx).trim() : 'AI Insight';
+      const message = colonIdx > 0 && colonIdx < 40 ? body.substring(colonIdx + 1).trim() : body;
+
+      advices.push({
+        id: 'llm_' + advices.length,
+        severity, icon, title, message
+      });
+    }
+    // If nothing parsed, wrap entire response as single info card
+    if (advices.length === 0 && text.trim()) {
+      advices.push({
+        id: 'llm_raw', severity: 'info', icon: 'ri-robot-2-line',
+        title: 'AI Analysis', message: text.substring(0, 400)
+      });
+    }
+    return advices;
   }
 
   runAdvisor(stats: SystemStats) {
@@ -1206,5 +1365,9 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.advisorScore >= 60) return 'Fair';
     if (this.advisorScore >= 40) return 'Poor';
     return 'Critical';
+  }
+
+  getSelectedModelLabel(): string {
+    return this.AVAILABLE_MODELS.find(m => m.id === this.selectedModel)?.label ?? this.selectedModel;
   }
 }
