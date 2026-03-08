@@ -20,6 +20,17 @@ struct ProcessInfo {
     parent_pid: Option<u32>,
     cpu_usage: f32,
     memory: u64,
+    run_duration: u64,
+}
+
+#[derive(Serialize)]
+struct DockerContainer {
+    id: String,
+    name: String,
+    image: String,
+    status: String,
+    state: String,
+    ports: String,
 }
 
 #[derive(Serialize)]
@@ -34,6 +45,25 @@ struct StartupInfo {
     name: String,
     command: String,
     location: String,
+}
+
+#[derive(Serialize)]
+struct PortInfo {
+    port: u16,
+    protocol: String,
+    pid: u32,
+    process_name: String,
+    state: String,
+}
+
+#[derive(Serialize)]
+struct DevServerInfo {
+    framework: String,
+    url: String,
+    port: u16,
+    pid: u32,
+    process_name: String,
+    status: String,
 }
 
 #[derive(Serialize)]
@@ -172,6 +202,7 @@ fn get_system_stats(state: State<'_, Arc<AppState>>) -> SystemStats {
                 parent_pid: process.parent().map(|p| p.as_u32()),
                 cpu_usage: process.cpu_usage(),
                 memory: process.memory(),
+                run_duration: process.run_time(),
             }
         })
         .collect();
@@ -404,8 +435,237 @@ async fn save_export(
 }
 
 #[tauri::command]
+async fn get_active_ports(state: State<'_, Arc<AppState>>) -> Result<Vec<PortInfo>, String> {
+    use std::process::Command;
+
+    // On Windows, use netstat -ano to find listening ports
+    let output = if cfg!(target_os = "windows") {
+        Command::new("netstat")
+            .args(["-ano"]) // Get all, include UDP
+            .output()
+            .map_err(|e| e.to_string())?
+    } else {
+        return Err("OS not supported".to_string());
+    };
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut ports = Vec::new();
+
+    let mut sys = state.sys.lock().map_err(|e| e.to_string())?;
+    sys.refresh_all();
+
+    for line in stdout.lines().skip(4) {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 4 {
+            continue;
+        }
+
+        let protocol = parts[0];
+        let is_tcp = protocol == "TCP";
+        let is_udp = protocol == "UDP";
+
+        if !is_tcp && !is_udp {
+            continue;
+        }
+
+        // TCP has [Proto, Local, Foreign, State, PID]
+        // UDP has [Proto, Local, Foreign, PID]
+        let local_addr = parts[1];
+        let state_val = if is_tcp { parts[3] } else { "ACTIVE" };
+        let pid_str = if is_tcp { parts[4] } else { parts[3] };
+
+        if is_tcp && state_val != "LISTENING" {
+            continue;
+        }
+
+        if let Some(port_str) = local_addr.split(':').last() {
+            if let Ok(port) = port_str.parse::<u16>() {
+                if let Ok(pid) = pid_str.parse::<u32>() {
+                    let process_name = sys
+                        .process(sysinfo::Pid::from(pid as usize))
+                        .map(|p| p.name().to_string_lossy().into_owned())
+                        .unwrap_or_else(|| "Unknown".to_string());
+
+                    ports.push(PortInfo {
+                        port,
+                        protocol: protocol.to_string(),
+                        pid,
+                        process_name,
+                        state: state_val.to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    // Sort by port number
+    ports.sort_by_key(|p| p.port);
+    // Deduplicate (netstat sometimes shows same port on different interfaces)
+    ports.dedup_by_key(|p| p.port);
+
+    Ok(ports)
+}
+
+#[tauri::command]
+async fn get_dev_servers(state: State<'_, Arc<AppState>>) -> Result<Vec<DevServerInfo>, String> {
+    use std::process::Command;
+
+    let output = if cfg!(target_os = "windows") {
+        Command::new("netstat")
+            .args(["-ano"])
+            .output()
+            .map_err(|e| e.to_string())?
+    } else {
+        return Err("OS not supported".to_string());
+    };
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut servers = Vec::new();
+
+    let mut sys = state.sys.lock().map_err(|e| e.to_string())?;
+    sys.refresh_all();
+
+    for line in stdout.lines().skip(4) {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 4 {
+            continue;
+        }
+
+        let protocol = parts[0];
+        if protocol != "TCP" {
+            continue;
+        }
+
+        let local_addr = parts[1];
+        let state_val = if parts.len() > 3 { parts[3] } else { "" };
+        let pid_str = if parts.len() > 4 { parts[4] } else { "" };
+
+        if state_val != "LISTENING" || pid_str.is_empty() {
+            continue;
+        }
+
+        if let Some(port_str) = local_addr.split(':').last() {
+            if let Ok(port) = port_str.parse::<u16>() {
+                if let Ok(pid) = pid_str.parse::<u32>() {
+                    let process_name = sys
+                        .process(sysinfo::Pid::from(pid as usize))
+                        .map(|p| p.name().to_string_lossy().into_owned())
+                        .unwrap_or_else(|| "Unknown".to_string());
+
+                    let mut framework = "Local Server".to_string();
+                    let name_low = process_name.to_lowercase();
+
+                    if name_low.contains("node") {
+                        if port == 5173 {
+                            framework = "Vite / React / Vue".to_string();
+                        } else if port == 3000 {
+                            framework = "Next.js / Node / React".to_string();
+                        } else if port == 8080 || port == 8000 {
+                            framework = "Node.js Server".to_string();
+                        }
+                    } else if name_low.contains("python") {
+                        if port == 5000 {
+                            framework = "Flask / Python".to_string();
+                        } else if port == 8000 {
+                            framework = "Django / Python".to_string();
+                        }
+                    } else if name_low.contains("php") {
+                        framework = "PHP Server".to_string();
+                    } else if name_low.contains("go") {
+                        framework = "Golang Server".to_string();
+                    }
+
+                    if framework != "Local Server"
+                        || [3000, 3001, 5173, 5000, 8000, 8080].contains(&port)
+                    {
+                        servers.push(DevServerInfo {
+                            framework,
+                            url: format!("http://localhost:{}", port),
+                            port,
+                            pid,
+                            process_name,
+                            status: "Running".to_string(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(servers)
+}
+
+#[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}!", name)
+}
+
+#[tauri::command]
+fn open_project_folder(app: tauri::AppHandle, pid: u32) -> Result<(), String> {
+    use sysinfo::{Pid, System};
+    let mut sys = System::new();
+    sys.refresh_processes(
+        sysinfo::ProcessesToUpdate::Some(&[Pid::from(pid as usize)]),
+        true,
+    );
+
+    if let Some(process) = sys.process(Pid::from(pid as usize)) {
+        if let Some(cwd) = process.cwd() {
+            let path = cwd.to_string_lossy().to_string();
+            let opener = app.opener();
+            let _ = opener.open_path(path, Option::<String>::None);
+            return Ok(());
+        }
+    }
+    Err("Could not find project folder for this process".to_string())
+}
+
+#[tauri::command]
+async fn get_docker_containers() -> Result<Vec<DockerContainer>, String> {
+    use std::process::Command;
+    let output = Command::new("docker")
+        .args([
+            "ps",
+            "-a",
+            "--format",
+            "{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.State}}|{{.Ports}}",
+        ])
+        .output()
+        .map_err(|e| format!("Docker not found or error: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut containers = Vec::new();
+
+    for line in stdout.lines() {
+        let parts: Vec<&str> = line.split('|').collect();
+        if parts.len() >= 6 {
+            containers.push(DockerContainer {
+                id: parts[0].to_string(),
+                name: parts[1].to_string(),
+                image: parts[2].to_string(),
+                status: parts[3].to_string(),
+                state: parts[4].to_string(),
+                ports: parts[5].to_string(),
+            });
+        }
+    }
+    Ok(containers)
+}
+
+#[tauri::command]
+async fn control_docker_container(id: String, action: String) -> Result<(), String> {
+    use std::process::Command;
+    let valid_actions = ["start", "stop", "restart"];
+    if !valid_actions.contains(&action.as_str()) {
+        return Err("Invalid action".to_string());
+    }
+
+    Command::new("docker")
+        .args([&action, &id])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -455,7 +715,12 @@ pub fn run() {
             get_services,
             control_service,
             get_startup_apps,
-            save_export
+            save_export,
+            get_active_ports,
+            get_dev_servers,
+            open_project_folder,
+            get_docker_containers,
+            control_docker_container
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

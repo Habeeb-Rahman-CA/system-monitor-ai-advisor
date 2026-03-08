@@ -59,15 +59,23 @@
     </div>
 
     <nav class="sidebar-nav">
-      <button class="nav-item" [class.active]="activeTab === 'dashboard'" (click)="setActiveTab('dashboard')">
+      <button class="nav-item" [class.active]="activeTab === 'dashboard'" (click)="setTab('dashboard')">
         <span class="nav-icon"><i class="ri-dashboard-2-line"></i></span>
         <span class="nav-label" *ngIf="!isSidebarCollapsed">Dashboard</span>
       </button>
-      <button class="nav-item" [class.active]="activeTab === 'management'" (click)="setActiveTab('management')">
+      <button class="nav-item" [class.active]="activeTab === 'processes'" (click)="setTab('processes')">
+        <span class="nav-icon"><i class="ri-cpu-line"></i></span>
+        <span class="nav-label" *ngIf="!isSidebarCollapsed">Processes</span>
+      </button>
+      <button class="nav-item" [class.active]="activeTab === 'management'" (click)="setTab('management')">
         <span class="nav-icon"><i class="ri-settings-3-line"></i></span>
         <span class="nav-label" *ngIf="!isSidebarCollapsed">Management</span>
       </button>
-      <button class="nav-item" [class.active]="activeTab === 'reports'" (click)="setActiveTab('reports')">
+      <button class="nav-item" [class.active]="activeTab === 'dev'" (click)="setTab('dev')">
+        <span class="nav-icon"><i class="ri-braces-line"></i></span>
+        <span class="nav-label" *ngIf="!isSidebarCollapsed">Developer</span>
+      </button>
+      <button class="nav-item" [class.active]="activeTab === 'reports'" (click)="setTab('reports')">
         <span class="nav-icon"><i class="ri-file-chart-line"></i></span>
         <span class="nav-label" *ngIf="!isSidebarCollapsed">Reports</span>
       </button>
@@ -547,6 +555,194 @@
         </div>
       </div>
     </section>
+    <!-- Developer Center View -->
+    <section class="management-view" [class.hidden]="activeTab !== 'dev'">
+      <div class="management-header">
+        <div class="mgmt-title">
+          <h2><i class="ri-braces-line"></i> Developer Control Center</h2>
+          <p>Active network listeners and debug tools</p>
+        </div>
+        <button class="refresh-btn" (click)="refreshDevData()" [disabled]="isLoadingPorts">
+          <i class="ri-refresh-line" [class.spin]="isLoadingPorts"></i> Refresh
+        </button>
+      </div>
+
+      <div class="management-tabs">
+        <button [class.active]="devSubTab === 'ports'" (click)="setDevSubTab('ports')">Ports in Use</button>
+        <button [class.active]="devSubTab === 'servers'" (click)="setDevSubTab('servers')">Localhost Servers</button>
+        <button [class.active]="devSubTab === 'coding'" (click)="setDevSubTab('coding')">Coding Procs</button>
+        <button [class.active]="devSubTab === 'docker'" (click)="setDevSubTab('docker')">Docker</button>
+      </div>
+
+      <div class="management-controls">
+        <div class="search-box">
+          <i class="ri-search-line"></i>
+          <input type="text" placeholder="Filter ports, servers, or containers..." [ngModel]="managementSearchTerm"
+            (input)="onMgmtSearch($event)">
+        </div>
+      </div>
+
+      <div class="management-list-container">
+        <!-- Ports Table -->
+        <div *ngIf="devSubTab === 'ports' && !isLoadingPorts">
+          <table class="mgmt-table">
+            <thead>
+              <tr>
+                <th>Port</th>
+                <th>Protocol</th>
+                <th>PID</th>
+                <th>Process Name</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let p of p_filteredPorts | slice:0:100; trackBy: trackByKey">
+                <td class="primary-text"><strong>{{ p.port }}</strong></td>
+                <td><span class="status-badge" [class.running]="p.protocol === 'TCP'">{{ p.protocol }}</span></td>
+                <td>{{ p.pid }}</td>
+                <td>{{ p.process_name }}</td>
+                <td>{{ p.state }}</td>
+              </tr>
+              <tr *ngIf="p_filteredPorts.length === 0 && !isLoadingPorts">
+                <td colspan="5" class="empty-state" style="text-align: center; padding: 2rem;">No active ports found
+                  matching filter</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Dev Servers Table -->
+        <div *ngIf="devSubTab === 'servers' && !isLoadingServers">
+          <table class="mgmt-table">
+            <thead>
+              <tr>
+                <th>Framework</th>
+                <th>URL</th>
+                <th>Port</th>
+                <th>PID</th>
+                <th>Process Name</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let s of p_filteredDevServers | slice:0:100; trackBy: trackByKey">
+                <td class="primary-text"><strong>{{ s.framework }}</strong></td>
+                <td>
+                  <a [href]="s.url" target="_blank" class="dev-link">
+                    <i class="ri-external-link-line"></i> {{ s.url }}
+                  </a>
+                </td>
+                <td>{{ s.port }}</td>
+                <td>{{ s.pid }}</td>
+                <td>{{ s.process_name }}</td>
+                <td><span class="status-badge running">{{ s.status }}</span></td>
+              </tr>
+              <tr *ngIf="p_filteredDevServers.length === 0 && !isLoadingServers">
+                <td colspan="6" class="empty-state" style="text-align: center; padding: 2rem;">No development servers
+                  detected</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Coding Processes Table -->
+        <div *ngIf="devSubTab === 'coding' && !isLoadingCoding">
+          <table class="mgmt-table">
+            <thead>
+              <tr>
+                <th>Process</th>
+                <th>PID</th>
+                <th>CPU%</th>
+                <th>RAM</th>
+                <th>Runtime</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let p of p_filteredCodingProcesses; trackBy: trackByPid">
+                <td class="primary-text"><strong>{{ p.name }}</strong></td>
+                <td>{{ p.pid }}</td>
+                <td>{{ p.cpu_usage.toFixed(1) }}%</td>
+                <td>{{ formatBytes(p.memory) }}</td>
+                <td>{{ formatDuration(p.run_duration) }}</td>
+                <td>
+                  <div class="action-btns">
+                    <button class="mgmt-btn" (click)="killProcess(p.pid)" title="Kill Process">
+                      <i class="ri-close-circle-fill"></i> Kill
+                    </button>
+                    <button class="mgmt-btn secondary" (click)="openProjectFolder(p.pid)" title="Open Folder">
+                      <i class="ri-folder-open-fill"></i> Open
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="p_filteredCodingProcesses.length === 0 && !isLoadingCoding">
+                <td colspan="6" class="empty-state" style="text-align: center; padding: 2rem;">No coding processes
+                  detected</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Docker Table -->
+        <div *ngIf="devSubTab === 'docker' && !isLoadingDocker">
+          <table class="mgmt-table">
+            <thead>
+              <tr>
+                <th>Container Name</th>
+                <th>Image</th>
+                <th>Status</th>
+                <th>Ports</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let c of p_filteredDockerContainers; trackBy: trackByKey">
+                <td class="primary-text"><strong>{{ c.name }}</strong></td>
+                <td>{{ c.image }}</td>
+                <td>
+                  <span class="status-badge" [class.running]="c.state === 'running'"
+                    [class.stopped]="c.state === 'exited'">
+                    {{ c.status }}
+                  </span>
+                </td>
+                <td class="ports-cell">{{ c.ports }}</td>
+                <td>
+                  <div class="action-btns">
+                    <button class="mgmt-btn" *ngIf="c.state !== 'running'" (click)="controlDocker(c.id, 'start')"
+                      title="Start">
+                      <i class="ri-play-fill"></i>
+                    </button>
+                    <button class="mgmt-btn" *ngIf="c.state === 'running'" (click)="controlDocker(c.id, 'stop')"
+                      title="Stop">
+                      <i class="ri-stop-fill"></i>
+                    </button>
+                    <button class="mgmt-btn secondary" (click)="controlDocker(c.id, 'restart')" title="Restart">
+                      <i class="ri-restart-line"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="p_filteredDockerContainers.length === 0 && !isLoadingDocker">
+                <td colspan="5" class="empty-state" style="text-align: center; padding: 2rem;">No Docker containers
+                  found
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="loading-overlay" *ngIf="isLoadingPorts || isLoadingServers || isLoadingCoding || isLoadingDocker"
+          style="text-align: center; padding: 3rem;">
+          <div class="spinner"></div>
+          <p>{{ isLoadingPorts ? 'Scanning active ports...' :
+            isLoadingServers ? 'Detecting development servers...' :
+            isLoadingCoding ? 'Scanning coding processes...' :
+            'Fetching Docker containers...' }}</p>
+        </div>
+      </div>
+    </section>
+
     <!-- Reports View -->
     <section class="reports-view" [class.hidden]="activeTab !== 'reports'">
       <div class="reports-header">

@@ -1099,6 +1099,21 @@ h3 {
   gap: 1rem;
 }
 
+.dev-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.2s var(--ease-decel);
+}
+
+.dev-link:hover {
+  text-decoration: underline;
+  filter: brightness(1.2);
+}
+
 .search-box {
   background: var(--fluent-layer-3);
   border: 1px solid var(--fluent-stroke);
@@ -1437,6 +1452,28 @@ h3 {
   max-height: 60vh;
   overflow-y: auto;
   box-shadow: var(--shadow-2);
+}
+
+.management-controls {
+  margin: 1rem 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.management-list-container {
+  background: var(--fluent-layer-2);
+  border: 1px solid var(--fluent-stroke-card);
+  border-radius: 8px;
+  padding: 1.25rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-2);
+  position: relative;
+}
+
+.primary-text {
+  color: var(--primary);
 }
 
 .mgmt-table {
@@ -2018,4 +2055,76 @@ h3 {
 
 .spin {
   animation: spin 1s linear infinite;
+}
+
+/* ── Action Buttons for Mgmt Tables ───────────────────── */
+.action-btns {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.action-btns .mgmt-btn {
+  padding: 0.25rem 0.6rem;
+  min-width: 40px;
+}
+
+.mgmt-btn.secondary {
+  background: var(--fluent-layer-3);
+  border-color: var(--fluent-divider);
+  color: var(--text-primary);
+}
+
+.mgmt-btn.secondary:hover {
+  background: var(--fluent-surface);
+}
+
+/* ── Docker Specific Styles ────────────────────────────── */
+.status-badge.stopped {
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--accent-red);
+  border: 1px solid rgba(255, 107, 107, 0.2);
+}
+
+.ports-cell {
+  font-family: 'Segoe UI', monospace;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  max-width: 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ports-cell:hover {
+  white-space: normal;
+  word-break: break-all;
+  overflow: visible;
+}
+
+/* ── Developer Link ───────────────────────────────────── */
+.dev-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: opacity 0.2s;
+}
+
+.dev-link:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.primary-text strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.empty-state {
+  color: var(--text-tertiary);
+  font-style: italic;
+  font-size: 0.85rem;
 }

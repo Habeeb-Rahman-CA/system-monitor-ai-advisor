@@ -49,14 +49,44 @@ interface StartupInfo {
   location: string;
 }
 
+interface PortInfo {
+  port: number;
+  protocol: string;
+  pid: number;
+  process_name: string;
+  state: string;
+}
+
+interface DevServerInfo {
+  framework: string;
+  url: string;
+  port: number;
+  pid: number;
+  process_name: string;
+  status: string;
+}
+
 interface ProcessInfo {
-  name: string;
   pid: number;
   parent_pid: number | null;
+  name: string;
   cpu_usage: number;
   memory: number;
+  run_duration: number; // in seconds
+  status: string;
+  exe_path: string;
   isFavorite?: boolean;
+  children?: ProcessInfo[];
   isExpanded?: boolean;
+}
+
+interface DockerContainer {
+  id: string;
+  name: string;
+  image: string;
+  status: string;
+  state: string;
+  ports: string;
 }
 
 type ProcessSortKey = 'name' | 'cpu_usage' | 'memory' | 'pid';
@@ -149,13 +179,27 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   showTree = false;
 
   // Management State
-  activeTab: 'dashboard' | 'management' | 'reports' = 'dashboard';
+  activeTab: 'dashboard' | 'processes' | 'management' | 'advisor' | 'reports' | 'dev' = 'dashboard';
+  lastMgmtRefresh = 0;
+  isLoadingMgmt = false;
+  mgmtSubTab: 'services' | 'startup' = 'services';
+  devSubTab: 'ports' | 'servers' | 'coding' | 'docker' = 'ports';
   services: ServiceInfo[] = [];
   startupApps: StartupInfo[] = [];
+  activePorts: PortInfo[] = [];
+  p_filteredPorts: PortInfo[] = [];
+  devServers: DevServerInfo[] = [];
+  p_filteredDevServers: DevServerInfo[] = [];
+  codingProcesses: ProcessInfo[] = [];
+  p_filteredCodingProcesses: ProcessInfo[] = [];
+  dockerContainers: DockerContainer[] = [];
+  p_filteredDockerContainers: DockerContainer[] = [];
+  isLoadingPorts = false;
+  isLoadingServers = false;
+  isLoadingCoding = false;
+  isLoadingDocker = false;
+  lastPortsRefresh = 0;
   managementSearchTerm = '';
-  mgmtSubTab: 'services' | 'startup' = 'services';
-  isLoadingMgmt = false;
-  lastMgmtRefresh = 0;
 
   // Cached Filtered Lists
   p_filteredProcesses: ProcessInfo[] = [];
@@ -301,6 +345,34 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
         a.command.toLowerCase().includes(term)
       );
     }
+  }
+
+  updateFilteredPorts() {
+    const term = this.managementSearchTerm.toLowerCase();
+    if (!term) {
+      this.p_filteredPorts = [...this.activePorts];
+    } else {
+      this.p_filteredPorts = this.activePorts.filter(p =>
+        p.port.toString().includes(term) ||
+        p.process_name.toLowerCase().includes(term) ||
+        p.protocol.toLowerCase().includes(term)
+      );
+    }
+    this.cdr.markForCheck();
+  }
+
+  updateFilteredDevServers() {
+    const term = this.managementSearchTerm.toLowerCase();
+    if (!term) {
+      this.p_filteredDevServers = [...this.devServers];
+    } else {
+      this.p_filteredDevServers = this.devServers.filter(s =>
+        s.framework.toLowerCase().includes(term) ||
+        s.port.toString().includes(term) ||
+        s.process_name.toLowerCase().includes(term)
+      );
+    }
+    this.cdr.markForCheck();
   }
 
   ngAfterViewInit() {
@@ -699,15 +771,18 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // --- Management Methods ---
 
-  setActiveTab(tab: 'dashboard' | 'management' | 'reports') {
+  setTab(tab: 'dashboard' | 'processes' | 'management' | 'advisor' | 'reports' | 'dev') {
     this.activeTab = tab;
     if (tab === 'management') {
       this.refreshManagementData();
+    } else if (tab === 'dev') {
+      this.refreshDevData();
     }
+    this.cdr.markForCheck();
   }
 
-  setMgmtSubTab(subTab: 'services' | 'startup') {
-    this.mgmtSubTab = subTab;
+  setMgmtSubTab(sub: 'services' | 'startup') {
+    this.mgmtSubTab = sub;
     this.refreshManagementData();
   }
 
@@ -926,6 +1001,65 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
+  async refreshDevData() {
+    if (this.isLoadingPorts || this.isLoadingServers || this.isLoadingCoding || this.isLoadingDocker) return;
+    try {
+      if (this.devSubTab === 'ports') {
+        this.isLoadingPorts = true;
+        this.activePorts = await invoke<PortInfo[]>('get_active_ports');
+        this.updateFilteredPorts();
+      } else if (this.devSubTab === 'servers') {
+        this.isLoadingServers = true;
+        this.devServers = await invoke<DevServerInfo[]>('get_dev_servers');
+        this.updateFilteredDevServers();
+      } else if (this.devSubTab === 'coding') {
+        this.isLoadingCoding = true;
+        if (this.systemStats) {
+          const keywords = ['node', 'npm', 'yarn', 'python', 'uvicorn', 'deno', 'rust', 'go', 'php'];
+          this.codingProcesses = this.systemStats.processes.filter(p =>
+            keywords.some(k => p.name.toLowerCase().includes(k))
+          );
+          this.updateFilteredCodingProcesses();
+        }
+      } else if (this.devSubTab === 'docker') {
+        this.isLoadingDocker = true;
+        this.dockerContainers = await invoke<DockerContainer[]>('get_docker_containers');
+        this.updateFilteredDockerContainers();
+      }
+      this.lastPortsRefresh = Date.now();
+    } catch (e) {
+      console.error("Failed to fetch dev data", e);
+    } finally {
+      this.isLoadingPorts = false;
+      this.isLoadingServers = false;
+      this.isLoadingCoding = false;
+      this.isLoadingDocker = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  updateFilteredCodingProcesses() {
+    if (!this.managementSearchTerm) {
+      this.p_filteredCodingProcesses = [...this.codingProcesses];
+    } else {
+      const term = this.managementSearchTerm.toLowerCase();
+      this.p_filteredCodingProcesses = this.codingProcesses.filter(p =>
+        p.name.toLowerCase().includes(term) || p.pid.toString().includes(term)
+      );
+    }
+  }
+
+  updateFilteredDockerContainers() {
+    if (!this.managementSearchTerm) {
+      this.p_filteredDockerContainers = [...this.dockerContainers];
+    } else {
+      const term = this.managementSearchTerm.toLowerCase();
+      this.p_filteredDockerContainers = this.dockerContainers.filter(c =>
+        c.name.toLowerCase().includes(term) || c.image.toLowerCase().includes(term)
+      );
+    }
+  }
+
   async refreshManagementData() {
     if (this.isLoadingMgmt) return;
     this.isLoadingMgmt = true;
@@ -1057,6 +1191,37 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     this.managementSearchTerm = event.target.value;
     this.updateFilteredServices();
     this.updateFilteredStartupApps();
+    this.updateFilteredPorts();
+    this.updateFilteredDevServers();
+    this.updateFilteredCodingProcesses();
+    this.updateFilteredDockerContainers();
+  }
+
+  setDevSubTab(tab: 'ports' | 'servers' | 'coding' | 'docker') {
+    this.devSubTab = tab;
+    this.refreshDevData();
+  }
+
+  async openProjectFolder(pid: number) {
+    try {
+      await invoke('open_project_folder', { pid });
+    } catch (e) {
+      alert(e);
+    }
+  }
+
+  async controlDocker(id: string, action: string) {
+    try {
+      this.isLoadingDocker = true;
+      this.cdr.markForCheck();
+      await invoke('control_docker_container', { id, action });
+      // Refresh after a short delay
+      setTimeout(() => this.refreshDevData(), 1000);
+    } catch (e) {
+      alert("Docker Error: " + e);
+      this.isLoadingDocker = false;
+      this.cdr.markForCheck();
+    }
   }
 
   // --- UI/UX Power Features ---
