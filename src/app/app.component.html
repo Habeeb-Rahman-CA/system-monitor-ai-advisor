@@ -76,8 +76,76 @@
       <button class="theme-toggle" (click)="toggleTheme()" [title]="isDarkMode ? 'Light Mode' : 'Dark Mode'">
         {{ isDarkMode ? '🌙' : '☀️' }}
       </button>
+      <button class="advisor-fab" (click)="toggleAdvisor()" [class.active]="isAdvisorOpen"
+        title="AI Performance Advisor" [class.has-issues]="advices.length > 0 && advices[0].severity === 'critical'">
+        🤖
+        <span class="advisor-badge" *ngIf="criticalAdviceCount > 0">
+          {{ criticalAdviceCount }}
+        </span>
+      </button>
     </div>
   </aside>
+
+  <!-- AI Performance Advisor Panel -->
+  <div class="advisor-panel" [class.open]="isAdvisorOpen">
+    <div class="advisor-header">
+      <div class="advisor-title">
+        <span class="advisor-robot">🤖</span>
+        <div>
+          <div class="advisor-label">AI Performance Advisor</div>
+          <div class="advisor-subtitle">Live system analysis</div>
+        </div>
+      </div>
+      <button class="advisor-close" (click)="toggleAdvisor()">✕</button>
+    </div>
+
+    <!-- Health Score Ring -->
+    <div class="advisor-score-section">
+      <div class="score-ring-wrap">
+        <svg class="score-ring" viewBox="0 0 80 80">
+          <circle class="score-bg" cx="40" cy="40" r="34" fill="none" stroke-width="7" />
+          <circle class="score-fill" cx="40" cy="40" r="34" fill="none" stroke-width="7"
+            [style.stroke]="getAdvisorScoreColor()" [style.stroke-dasharray]="'213.6'"
+            [style.stroke-dashoffset]="(213.6 * (1 - advisorScore / 100)).toString()" />
+        </svg>
+        <div class="score-value">
+          <span class="score-num" [style.color]="getAdvisorScoreColor()">{{ advisorScore }}</span>
+          <span class="score-unit">/ 100</span>
+        </div>
+      </div>
+      <div class="score-meta">
+        <div class="score-status" [style.color]="getAdvisorScoreColor()">{{ getAdvisorScoreLabel() }}</div>
+        <div class="score-desc">System Health Score</div>
+        <button class="refresh-btn" (click)="systemStats && runAdvisor(systemStats)">↺ Refresh</button>
+      </div>
+    </div>
+
+    <!-- Advice Cards -->
+    <div class="advice-list">
+      <div class="advice-card" *ngFor="let advice of advices" [class.critical]="advice.severity === 'critical'"
+        [class.warning]="advice.severity === 'warning'" [class.info]="advice.severity === 'info'"
+        [class.good]="advice.severity === 'good'">
+        <div class="advice-icon">{{ advice.icon }}</div>
+        <div class="advice-body">
+          <div class="advice-title">{{ advice.title }}</div>
+          <div class="advice-msg">{{ advice.message }}</div>
+          <div class="advice-action" *ngIf="advice.action">💡 {{ advice.action }}</div>
+        </div>
+        <div class="advice-severity-dot" [class]="advice.severity"></div>
+      </div>
+      <div class="advice-empty" *ngIf="advices.length === 0">
+        <div class="empty-spinner"></div>
+        <p>Analyzing system...</p>
+      </div>
+    </div>
+
+    <div class="advisor-footer">
+      <span>Updates every 10 seconds</span>
+    </div>
+  </div>
+
+  <!-- Advisor backdrop -->
+  <div class="advisor-backdrop" *ngIf="isAdvisorOpen" (click)="toggleAdvisor()"></div>
 
   <main class="main-content" [class.full-width]="isSidebarCollapsed || isMiniMode">
     <div class="top-bar-minimal" *ngIf="systemStats && !isMiniMode">

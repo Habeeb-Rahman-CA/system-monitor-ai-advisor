@@ -18,6 +18,15 @@ interface Alert {
   timestamp: number;
 }
 
+interface Advice {
+  id: string;
+  severity: 'critical' | 'warning' | 'info' | 'good';
+  icon: string;
+  title: string;
+  message: string;
+  action?: string;
+}
+
 interface DiskInfo {
   name: string;
   total_space: number;
@@ -162,6 +171,12 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   isAlwaysOnTop = false;
   isSidebarCollapsed = false;
 
+  // AI Advisor State
+  isAdvisorOpen = false;
+  advices: Advice[] = [];
+  advisorLastRun = 0;
+  advisorScore = 100; // 0–100 health score
+
   // Customizable Dashboard (Widget Visibility)
   widgetVisibility = {
     cpu: true,
@@ -182,6 +197,11 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       const now = Date.now();
       if (this.activeTab === 'management' && !this.isLoadingMgmt && (now - this.lastMgmtRefresh > 5000)) {
         this.refreshManagementData();
+      }
+      // Run advisor every 10 seconds
+      if (now - this.advisorLastRun > 10000) {
+        if (this.systemStats) this.runAdvisor(this.systemStats);
+        this.advisorLastRun = now;
       }
     }, 1000);
   }
@@ -281,6 +301,8 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       this.systemStats = stats;
       this.updateCaches();
       this.checkAlerts(stats);
+      // First load: run advisor immediately
+      if (firstLoad) this.runAdvisor(stats);
       this.cpuHistory.push(stats.cpu_usage);
       this.cpuHistory.shift();
       const memPct = (stats.memory_used / stats.memory_total) * 100;
@@ -972,5 +994,217 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   async closeWindow() {
     await appWindow.close();
+  }
+
+  // ── AI Performance Advisor ─────────────────────────────────────────────
+
+  toggleAdvisor() {
+    this.isAdvisorOpen = !this.isAdvisorOpen;
+    if (this.isAdvisorOpen && this.systemStats) {
+      this.runAdvisor(this.systemStats);
+    }
+  }
+
+  runAdvisor(stats: SystemStats) {
+    const advices: Advice[] = [];
+    const ramPct = (stats.memory_used / stats.memory_total) * 100;
+    let penalty = 0;
+
+    // ── CPU ────────────────────────────────────────────────────────────────
+    if (stats.cpu_usage > 95) {
+      advices.push({
+        id: 'cpu_critical', severity: 'critical', icon: '🔥',
+        title: 'CPU Maxed Out',
+        message: `Your CPU is at ${stats.cpu_usage.toFixed(1)}%. The system is severely bottlenecked.`,
+        action: 'Kill high-CPU processes below'
+      });
+      penalty += 35;
+    } else if (stats.cpu_usage > 85) {
+      advices.push({
+        id: 'cpu_high', severity: 'warning', icon: '⚡',
+        title: 'High CPU Usage',
+        message: `CPU at ${stats.cpu_usage.toFixed(1)}%. Performance may feel sluggish.`,
+        action: 'Check Process Controller for CPU hogs'
+      });
+      penalty += 20;
+    } else if (stats.cpu_usage < 15) {
+      advices.push({
+        id: 'cpu_idle', severity: 'good', icon: '✅',
+        title: 'CPU is Healthy',
+        message: `CPU usage is only ${stats.cpu_usage.toFixed(1)}%. Plenty of headroom.`
+      });
+    }
+
+    // ── RAM ────────────────────────────────────────────────────────────────
+    if (ramPct > 90) {
+      advices.push({
+        id: 'ram_critical', severity: 'critical', icon: '🧠',
+        title: 'Memory Almost Full',
+        message: `RAM at ${ramPct.toFixed(1)}% — only ${this.formatBytes(stats.memory_total - stats.memory_used)} free. Risk of crashes.`,
+        action: 'Close unused applications immediately'
+      });
+      penalty += 30;
+    } else if (ramPct > 80) {
+      advices.push({
+        id: 'ram_high', severity: 'warning', icon: '⚠️',
+        title: 'High Memory Usage',
+        message: `RAM at ${ramPct.toFixed(1)}%. Consider closing browser tabs or background apps.`,
+        action: 'Check which apps use the most RAM below'
+      });
+      penalty += 15;
+    }
+
+    // ── Temperature ────────────────────────────────────────────────────────
+    if (stats.cpu_temp && stats.cpu_temp > 90) {
+      advices.push({
+        id: 'temp_danger', severity: 'critical', icon: '🌡️',
+        title: 'CPU Dangerously Hot',
+        message: `Temperature is ${stats.cpu_temp.toFixed(0)}°C. Risk of thermal throttling or hardware damage.`,
+        action: 'Reduce workload and check cooling'
+      });
+      penalty += 30;
+    } else if (stats.cpu_temp && stats.cpu_temp > 80) {
+      advices.push({
+        id: 'temp_high', severity: 'warning', icon: '🌡️',
+        title: 'Elevated CPU Temperature',
+        message: `CPU is running at ${stats.cpu_temp.toFixed(0)}°C. Consider cleaning fans or reducing tasks.`,
+      });
+      penalty += 15;
+    }
+
+    // ── Disk ────────────────────────────────────────────────────────────────
+    stats.disks.forEach(disk => {
+      const usedPct = ((disk.total_space - disk.available_space) / disk.total_space) * 100;
+      if (disk.total_space === 0) return;
+      if (usedPct > 90) {
+        advices.push({
+          id: `disk_full_${disk.name}`, severity: 'critical', icon: '💾',
+          title: `Disk ${disk.name} Almost Full`,
+          message: `${usedPct.toFixed(1)}% used — only ${this.formatBytes(disk.available_space)} remaining.`,
+          action: 'Free up space or move files to another drive'
+        });
+        penalty += 20;
+      } else if (usedPct > 80) {
+        advices.push({
+          id: `disk_warn_${disk.name}`, severity: 'warning', icon: '💾',
+          title: `Disk ${disk.name} Getting Full`,
+          message: `${usedPct.toFixed(1)}% used. Consider cleaning up temporary files.`
+        });
+        penalty += 10;
+      }
+    });
+
+    // ── Network ────────────────────────────────────────────────────────────
+    if (stats.ping > 150) {
+      advices.push({
+        id: 'net_lag', severity: 'warning', icon: '🌐',
+        title: 'High Network Latency',
+        message: `Ping is ${stats.ping}ms — web browsing and calls may feel slow.`,
+        action: 'Check network or restart router'
+      });
+      penalty += 10;
+    } else if (stats.ping === 0) {
+      advices.push({
+        id: 'net_down', severity: 'critical', icon: '📡',
+        title: 'No Internet Connection',
+        message: 'Unable to reach the network. Check your connection.',
+      });
+      penalty += 20;
+    }
+
+    // ── Process-specific hotspots ──────────────────────────────────────────
+    const GB = 1024 * 1024 * 1024;
+    const MB = 1024 * 1024;
+
+    // Aggregate Chrome memory
+    const chromeProcs = stats.processes.filter(p =>
+      p.name.toLowerCase().includes('chrome') ||
+      p.name.toLowerCase().includes('chromium')
+    );
+    const chromeRam = chromeProcs.reduce((sum, p) => sum + p.memory, 0);
+    if (chromeRam > GB) {
+      advices.push({
+        id: 'chrome_ram', severity: 'warning', icon: '🌐',
+        title: 'Chrome Using Too Much RAM',
+        message: `Chrome is consuming ${this.formatBytes(chromeRam)}. Close unused tabs to free memory.`,
+        action: 'Open Chrome → Menu → More Tools → Task Manager'
+      });
+      penalty += 10;
+    } else if (chromeRam > 500 * MB) {
+      advices.push({
+        id: 'chrome_ram_warn', severity: 'info', icon: '🌐',
+        title: 'Chrome RAM Usage Elevated',
+        message: `Chrome is using ${this.formatBytes(chromeRam)}. Closing idle tabs can help.`
+      });
+    }
+
+    // Single process hogging CPU
+    const cpuHog = stats.processes.find(p => p.cpu_usage > 50);
+    if (cpuHog) {
+      advices.push({
+        id: 'proc_cpu_hog', severity: 'warning', icon: '🚀',
+        title: 'Process Hogging CPU',
+        message: `"${cpuHog.name}" (PID ${cpuHog.pid}) is using ${cpuHog.cpu_usage.toFixed(1)}% CPU.`,
+        action: 'Kill it in Process Controller if not needed'
+      });
+      penalty += 10;
+    }
+
+    // Single process hogging RAM (>1.5GB)
+    const ramHog = stats.processes
+      .filter(p => !p.name.toLowerCase().includes('chrome'))
+      .find(p => p.memory > 1.5 * GB);
+    if (ramHog) {
+      advices.push({
+        id: 'proc_ram_hog', severity: 'warning', icon: '🧠',
+        title: 'High-Memory Process Detected',
+        message: `"${ramHog.name}" is using ${this.formatBytes(ramHog.memory)} of RAM.`,
+        action: 'Consider restarting or closing this app'
+      });
+      penalty += 8;
+    }
+
+    // ── GPU ───────────────────────────────────────────────────────────────
+    if (stats.gpu_usage > 95) {
+      advices.push({
+        id: 'gpu_maxed', severity: 'warning', icon: '🎮',
+        title: 'GPU at Maximum Load',
+        message: `GPU usage is ${stats.gpu_usage.toFixed(1)}%. Reduce graphics-intensive tasks if performance drops.`
+      });
+      penalty += 8;
+    }
+
+    // ── All Good ─────────────────────────────────────────────────────────
+    if (advices.filter(a => a.severity !== 'good').length === 0) {
+      advices.push({
+        id: 'all_good', severity: 'good', icon: '🎉',
+        title: 'System is Running Great',
+        message: 'All metrics are within healthy ranges. No action needed.'
+      });
+    }
+
+    // Sort: critical → warning → info → good
+    const order = { critical: 0, warning: 1, info: 2, good: 3 };
+    advices.sort((a, b) => order[a.severity] - order[b.severity]);
+
+    this.advices = advices;
+    this.advisorScore = Math.max(0, 100 - penalty);
+  }
+
+  get criticalAdviceCount(): number {
+    return this.advices.filter(a => a.severity === 'critical').length;
+  }
+
+  getAdvisorScoreColor(): string {
+    if (this.advisorScore >= 80) return '#00ff88';
+    if (this.advisorScore >= 60) return '#ffcc00';
+    return '#ff4b2b';
+  }
+
+  getAdvisorScoreLabel(): string {
+    if (this.advisorScore >= 80) return 'Healthy';
+    if (this.advisorScore >= 60) return 'Fair';
+    if (this.advisorScore >= 40) return 'Poor';
+    return 'Critical';
   }
 }
