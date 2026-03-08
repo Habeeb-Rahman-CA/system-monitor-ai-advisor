@@ -123,6 +123,26 @@ interface EnvironmentInfo {
   shell_type: string;
 }
 
+interface HttpRequest {
+  method: string;
+  url: string;
+  headers: { [key: string]: string };
+  body: string | null;
+}
+
+interface HttpResponse {
+  status: number;
+  headers: { [key: string]: string };
+  body: string;
+  time_ms: number;
+}
+
+interface SavedApiRequest {
+  id: string;
+  name: string;
+  request: HttpRequest;
+}
+
 type ProcessSortKey = 'name' | 'cpu_usage' | 'memory' | 'pid';
 
 interface SystemStats {
@@ -217,7 +237,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   lastMgmtRefresh = 0;
   isLoadingMgmt = false;
   mgmtSubTab: 'services' | 'startup' = 'services';
-  devSubTab: 'ports' | 'servers' | 'coding' | 'docker' | 'db' | 'pkg' | 'git' | 'env' = 'ports';
+  devSubTab: 'ports' | 'servers' | 'coding' | 'docker' | 'db' | 'pkg' | 'git' | 'env' | 'api' = 'ports';
   services: ServiceInfo[] = [];
   startupApps: StartupInfo[] = [];
   activePorts: PortInfo[] = [];
@@ -234,6 +254,20 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   p_filteredPkgManagers: PkgManagerInfo[] = [];
   gitStatus: GitStatus | null = null;
   environmentInfo: EnvironmentInfo | null = null;
+
+  // API Tool State
+  apiCollections: SavedApiRequest[] = [];
+  currentApiRequest: HttpRequest = {
+    method: 'GET',
+    url: 'https://jsonplaceholder.typicode.com/posts/1',
+    headers: { 'Content-Type': 'application/json' },
+    body: ''
+  };
+  apiResponse: HttpResponse | null = null;
+  apiHeadersList: { key: string, value: string }[] = [{ key: 'Content-Type', value: 'application/json' }];
+  isLoadingApi = false;
+  isSavingApi = false;
+  apiCollectionName = '';
   isLoadingPorts = false;
   isLoadingServers = false;
   isLoadingCoding = false;
@@ -1084,6 +1118,8 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       } else if (this.devSubTab === 'env') {
         this.isLoadingEnv = true;
         this.environmentInfo = await invoke<EnvironmentInfo>('get_environment_info');
+      } else if (this.devSubTab === 'api') {
+        await this.loadApiCollections();
       }
       this.lastPortsRefresh = Date.now();
     } catch (e) {
@@ -1284,7 +1320,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     this.updateFilteredPkgManagers();
   }
 
-  setDevSubTab(tab: 'ports' | 'servers' | 'coding' | 'docker' | 'db' | 'pkg' | 'git' | 'env') {
+  setDevSubTab(tab: 'ports' | 'servers' | 'coding' | 'docker' | 'db' | 'pkg' | 'git' | 'env' | 'api') {
     this.devSubTab = tab;
     this.refreshDevData();
   }
@@ -1294,6 +1330,109 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       await invoke('open_project_folder', { pid });
     } catch (e) {
       alert(e);
+    }
+  }
+
+  // --- API Tool Methods ---
+
+  addApiHeader() {
+    this.apiHeadersList.push({ key: '', value: '' });
+  }
+
+  removeApiHeader(index: number) {
+    this.apiHeadersList.splice(index, 1);
+  }
+
+  async sendApiRequest() {
+    if (!this.currentApiRequest.url) return;
+    this.isLoadingApi = true;
+    this.apiResponse = null;
+
+    // Sync headers map from list
+    const headers: { [key: string]: string } = {};
+    this.apiHeadersList.forEach(h => {
+      if (h.key.trim()) headers[h.key] = h.value;
+    });
+    this.currentApiRequest.headers = headers;
+
+    try {
+      this.apiResponse = await invoke<HttpResponse>('send_api_request', { req: this.currentApiRequest });
+    } catch (e) {
+      alert("API Request failed: " + e);
+    } finally {
+      this.isLoadingApi = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async loadApiCollections() {
+    try {
+      this.apiCollections = await invoke<SavedApiRequest[]>('get_saved_api_collections');
+    } catch (e) {
+      console.error("Failed to load API collections", e);
+    }
+  }
+
+  async saveToCollection() {
+    if (!this.apiCollectionName) {
+      const name = prompt("Enter a name for this request:");
+      if (!name) return;
+      this.apiCollectionName = name;
+    }
+
+    this.isSavingApi = true;
+
+    // Sync headers
+    const headers: { [key: string]: string } = {};
+    this.apiHeadersList.forEach(h => {
+      if (h.key.trim()) headers[h.key] = h.value;
+    });
+    this.currentApiRequest.headers = headers;
+
+    const saved: SavedApiRequest = {
+      id: Math.random().toString(36).substring(7),
+      name: this.apiCollectionName,
+      request: { ...this.currentApiRequest }
+    };
+
+    try {
+      await invoke('save_api_request', { request: saved });
+      await this.loadApiCollections();
+      this.apiCollectionName = '';
+    } catch (e) {
+      alert("Failed to save request: " + e);
+    } finally {
+      this.isSavingApi = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  loadFromCollection(item: SavedApiRequest) {
+    this.currentApiRequest = { ...item.request };
+    this.apiHeadersList = Object.entries(item.request.headers).map(([key, value]) => ({ key, value }));
+    if (this.apiHeadersList.length === 0) this.apiHeadersList.push({ key: '', value: '' });
+    this.activeTab = 'dev';
+    this.devSubTab = 'api';
+    this.cdr.markForCheck();
+  }
+
+  async deleteFromCollection(id: string, event: Event) {
+    event.stopPropagation();
+    if (!confirm("Are you sure you want to delete this saved request?")) return;
+    try {
+      await invoke('delete_api_request', { id });
+      await this.loadApiCollections();
+    } catch (e) {
+      alert("Failed to delete request: " + e);
+    }
+  }
+
+  formatJsonResponse(body: string): string {
+    try {
+      const obj = JSON.parse(body);
+      return JSON.stringify(obj, null, 2);
+    } catch (e) {
+      return body;
     }
   }
 

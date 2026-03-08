@@ -576,6 +576,7 @@
         <button [class.active]="devSubTab === 'pkg'" (click)="setDevSubTab('pkg')">Pkg Managers</button>
         <button [class.active]="devSubTab === 'git'" (click)="setDevSubTab('git')">Git</button>
         <button [class.active]="devSubTab === 'env'" (click)="setDevSubTab('env')">Env Info</button>
+        <button [class.active]="devSubTab === 'api'" (click)="setDevSubTab('api')">API Tools</button>
       </div>
 
       <div class="management-controls">
@@ -871,6 +872,104 @@
           <div *ngIf="!environmentInfo" class="empty-state">
             <i class="ri-error-warning-line"></i>
             <p>Failed to collect environment information</p>
+          </div>
+        </div>
+
+        <!-- API Tool View -->
+        <div *ngIf="devSubTab === 'api'" class="api-tool-container fade-in">
+          <div class="api-sidebar-collections">
+            <div class="collection-header">
+              <span><i class="ri-folder-open-line"></i> Collections</span>
+            </div>
+            <div class="collection-list">
+              <div *ngFor="let item of apiCollections; trackBy: trackByKey" class="collection-item"
+                (click)="loadFromCollection(item)">
+                <div class="item-meta">
+                  <span class="method-badge" [class]="item.request.method.toLowerCase()">{{ item.request.method
+                    }}</span>
+                  <span class="item-name">{{ item.name }}</span>
+                </div>
+                <button class="delete-item" (click)="deleteFromCollection(item.id, $event)"><i
+                    class="ri-delete-bin-line"></i></button>
+              </div>
+              <div *ngIf="apiCollections.length === 0" class="empty-collections">
+                No saved requests
+              </div>
+            </div>
+          </div>
+
+          <div class="api-main-tester">
+            <div class="request-bar">
+              <select [(ngModel)]="currentApiRequest.method" class="method-select">
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+                <option value="PATCH">PATCH</option>
+              </select>
+              <input type="text" [(ngModel)]="currentApiRequest.url" placeholder="https://api.example.com/v1/resource"
+                class="url-input">
+              <button class="send-btn" (click)="sendApiRequest()" [disabled]="isLoadingApi">
+                <i class="ri-send-plane-fill" [class.spin]="isLoadingApi"></i> {{ isLoadingApi ? 'Sending...' : 'Send'
+                }}
+              </button>
+              <button class="save-coll-btn" (click)="saveToCollection()" title="Save to Collection">
+                <i class="ri-save-line"></i>
+              </button>
+            </div>
+
+            <div class="request-tabs-container">
+              <div class="mgmt-tabs small">
+                <button class="small-tab active">Headers</button>
+                <button class="small-tab"
+                  *ngIf="['POST', 'PUT', 'PATCH'].includes(currentApiRequest.method)">Body</button>
+              </div>
+
+              <div class="request-config-panel">
+                <!-- Headers -->
+                <div class="headers-config">
+                  <div class="header-row" *ngFor="let h of apiHeadersList; let i = index; trackBy: trackByIndex">
+                    <input type="text" [(ngModel)]="h.key" placeholder="Key" class="h-input">
+                    <input type="text" [(ngModel)]="h.value" placeholder="Value" class="h-input">
+                    <button class="remove-h" (click)="removeApiHeader(i)"><i class="ri-close-line"></i></button>
+                  </div>
+                  <button class="add-h-btn" (click)="addApiHeader()"><i class="ri-add-line"></i> Add Header</button>
+                </div>
+
+                <!-- Body (Conditional) -->
+                <div class="body-config" *ngIf="['POST', 'PUT', 'PATCH'].includes(currentApiRequest.method)">
+                  <textarea [(ngModel)]="currentApiRequest.body" placeholder='{ "key": "value" }'
+                    class="body-textarea"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="response-viewer">
+              <div class="res-header" *ngIf="apiResponse">
+                <div class="res-meta">
+                  <span class="status-badge" [class.success]="apiResponse.status < 400">{{ apiResponse.status }} {{
+                    apiResponse.status === 200 ? 'OK' : '' }}</span>
+                  <span class="time-meta"><i class="ri-time-line"></i> {{ apiResponse.time_ms }} ms</span>
+                  <span class="size-meta"><i class="ri-hard-drive-line"></i> {{ formatBytes(apiResponse.body.length)
+                    }}</span>
+                </div>
+              </div>
+
+              <div class="res-body-container">
+                <div *ngIf="!apiResponse && !isLoadingApi" class="res-empty">
+                  <i class="ri-base-station-line"></i>
+                  <p>Send a request to see the response</p>
+                </div>
+
+                <div *ngIf="isLoadingApi" class="res-loading">
+                  <div class="spinner"></div>
+                  <p>Waiting for response...</p>
+                </div>
+
+                <pre *ngIf="apiResponse"
+                  class="res-pretty-json"><code>{{ formatJsonResponse(apiResponse.body) }}</code></pre>
+              </div>
+            </div>
           </div>
         </div>
 

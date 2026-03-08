@@ -150,6 +150,29 @@ pub struct AppState {
     last_sample_time: Mutex<std::time::Instant>,
 }
 
+#[derive(serde::Deserialize, Serialize, Clone)]
+struct HttpRequest {
+    method: String,
+    url: String,
+    headers: std::collections::HashMap<String, String>,
+    body: Option<String>,
+}
+
+#[derive(Serialize)]
+struct HttpResponse {
+    status: u16,
+    headers: std::collections::HashMap<String, String>,
+    body: String,
+    time_ms: u64,
+}
+
+#[derive(serde::Deserialize, Serialize, Clone)]
+struct SavedApiRequest {
+    id: String,
+    name: String,
+    request: HttpRequest,
+}
+
 #[tauri::command]
 fn get_system_stats(state: State<'_, Arc<AppState>>) -> SystemStats {
     let mut sys = state.sys.lock().unwrap();
@@ -915,6 +938,120 @@ async fn get_environment_info() -> Result<EnvironmentInfo, String> {
     Ok(info)
 }
 
+#[tauri::command]
+async fn send_api_request(req: HttpRequest) -> Result<HttpResponse, String> {
+    use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+    use std::time::Instant;
+
+    let client = reqwest::Client::new();
+    let method = match req.method.to_uppercase().as_str() {
+        "GET" => reqwest::Method::GET,
+        "POST" => reqwest::Method::POST,
+        "PUT" => reqwest::Method::PUT,
+        "DELETE" => reqwest::Method::DELETE,
+        "PATCH" => reqwest::Method::PATCH,
+        _ => return Err("Invalid HTTP method".to_string()),
+    };
+
+    let mut builder = client.request(method, &req.url);
+
+    let mut headers = HeaderMap::new();
+    for (key, val) in req.headers {
+        if let (Ok(h_key), Ok(h_val)) = (
+            HeaderName::from_bytes(key.as_bytes()),
+            HeaderValue::from_str(&val),
+        ) {
+            headers.insert(h_key, h_val);
+        }
+    }
+    builder = builder.headers(headers);
+
+    if let Some(body) = req.body {
+        if !body.is_empty() {
+            builder = builder.body(body);
+        }
+    }
+
+    let start = Instant::now();
+    let response = builder.send().await.map_err(|e| e.to_string())?;
+    let duration = start.elapsed().as_millis() as u64;
+
+    let status = response.status().as_u16();
+    let mut resp_headers = std::collections::HashMap::new();
+    for (name, value) in response.headers() {
+        resp_headers.insert(name.to_string(), value.to_str().unwrap_or("").to_string());
+    }
+
+    let body = response.text().await.unwrap_or_default();
+
+    Ok(HttpResponse {
+        status,
+        headers: resp_headers,
+        body,
+        time_ms: duration,
+    })
+}
+
+#[tauri::command]
+fn get_saved_api_collections(app: tauri::AppHandle) -> Result<Vec<SavedApiRequest>, String> {
+    let path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("api_collections.json");
+    if !path.exists() {
+        return Ok(vec![]);
+    }
+    let data = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let collections: Vec<SavedApiRequest> =
+        serde_json::from_str(&data).map_err(|e| e.to_string())?;
+    Ok(collections)
+}
+
+#[tauri::command]
+fn save_api_request(app: tauri::AppHandle, request: SavedApiRequest) -> Result<(), String> {
+    let path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("api_collections.json");
+    let mut collections = vec![];
+    if path.exists() {
+        let data = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        collections = serde_json::from_str::<Vec<SavedApiRequest>>(&data).unwrap_or_default();
+    }
+
+    // Replace if exists, otherwise push
+    if let Some(pos) = collections.iter().position(|r| r.id == request.id) {
+        collections[pos] = request;
+    } else {
+        collections.push(request);
+    }
+
+    let data = serde_json::to_string_pretty(&collections).map_err(|e| e.to_string())?;
+    fs::write(path, data).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_api_request(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("api_collections.json");
+    if !path.exists() {
+        return Ok(());
+    }
+    let data = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut collections: Vec<SavedApiRequest> =
+        serde_json::from_str(&data).map_err(|e| e.to_string())?;
+    collections.retain(|r| r.id != id);
+    let data = serde_json::to_string_pretty(&collections).map_err(|e| e.to_string())?;
+    fs::write(path, data).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -971,7 +1108,11 @@ pub fn run() {
             get_db_servers,
             get_pkg_managers,
             get_git_activity,
-            get_environment_info
+            get_environment_info,
+            send_api_request,
+            get_saved_api_collections,
+            save_api_request,
+            delete_api_request
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
