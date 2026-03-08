@@ -3,9 +3,10 @@
   <div class="alert-stack">
     <div *ngFor="let alert of alerts" class="alert-box fade-in" [class]="alert.type">
       <div class="alert-header">
-        <span class="alert-icon">{{ alert.type === 'critical' ? '🔴' : '🟡' }}</span>
+        <span class="alert-icon"><i
+            [class]="alert.type === 'critical' ? 'ri-error-warning-fill' : 'ri-alert-fill'"></i></span>
         <span class="alert-title">{{ alert.title }}</span>
-        <button class="dismiss-btn" (click)="dismissAlert(alert.id)">×</button>
+        <button class="dismiss-btn" (click)="dismissAlert(alert.id)"><i class="ri-close-line"></i></button>
       </div>
       <div class="alert-body">
         {{ alert.message }}
@@ -15,13 +16,13 @@
 
   <div class="titlebar">
     <div data-tauri-drag-region class="drag-region"></div>
-    <div class="titlebar-logo">🛰️</div>
+    <div class="titlebar-logo"><i class="ri-radar-line"></i></div>
     <div class="titlebar-text" data-tauri-drag-region>{{ isMiniMode ? 'SYSMON' : 'System Monitor Pro' }}</div>
     <div class="window-controls">
       <div class="window-button mini-toggle" (click)="toggleMiniMode()" [class.active]="isMiniMode"
-        title="Mini Overlay">🪟</div>
+        title="Mini Overlay"><i class="ri-window-line"></i></div>
       <div class="window-button pin-toggle" (click)="toggleAlwaysOnTop()" [class.active]="isAlwaysOnTop"
-        title="Always on Top">📌</div>
+        title="Always on Top"><i class="ri-pushpin-2-line"></i></div>
       <div class="window-button minimize" (click)="minimizeWindow()">
         <svg width="12" height="12" viewBox="0 0 12 12">
           <rect fill="currentColor" x="2" y="5.5" width="8" height="1"></rect>
@@ -42,7 +43,7 @@
 
   <aside class="sidebar" [class.collapsed]="isSidebarCollapsed" *ngIf="!isMiniMode">
     <div class="sidebar-header">
-      <div class="logo">🛰️</div>
+      <div class="logo"><i class="ri-radar-line"></i></div>
       <h2 *ngIf="!isSidebarCollapsed">SYSMON</h2>
       <button class="collapse-btn" (click)="toggleSidebar()" [class.collapsed]="isSidebarCollapsed"
         title="Toggle Sidebar">
@@ -59,26 +60,26 @@
 
     <nav class="sidebar-nav">
       <button class="nav-item" [class.active]="activeTab === 'dashboard'" (click)="setActiveTab('dashboard')">
-        <span class="nav-icon">📊</span>
+        <span class="nav-icon"><i class="ri-dashboard-2-line"></i></span>
         <span class="nav-label" *ngIf="!isSidebarCollapsed">Dashboard</span>
       </button>
       <button class="nav-item" [class.active]="activeTab === 'management'" (click)="setActiveTab('management')">
-        <span class="nav-icon">⚙️</span>
+        <span class="nav-icon"><i class="ri-settings-3-line"></i></span>
         <span class="nav-label" *ngIf="!isSidebarCollapsed">Management</span>
       </button>
       <button class="nav-item" [class.active]="activeTab === 'reports'" (click)="setActiveTab('reports')">
-        <span class="nav-icon">📄</span>
+        <span class="nav-icon"><i class="ri-file-chart-line"></i></span>
         <span class="nav-label" *ngIf="!isSidebarCollapsed">Reports</span>
       </button>
     </nav>
 
     <div class="sidebar-footer">
       <button class="theme-toggle" (click)="toggleTheme()" [title]="isDarkMode ? 'Light Mode' : 'Dark Mode'">
-        {{ isDarkMode ? '🌙' : '☀️' }}
+        <i [class]="isDarkMode ? 'ri-moon-line' : 'ri-sun-line'"></i>
       </button>
       <button class="advisor-fab" (click)="toggleAdvisor()" [class.active]="isAdvisorOpen"
         title="AI Performance Advisor" [class.has-issues]="advices.length > 0 && advices[0].severity === 'critical'">
-        🤖
+        <i class="ri-robot-2-line"></i>
         <span class="advisor-badge" *ngIf="criticalAdviceCount > 0">
           {{ criticalAdviceCount }}
         </span>
@@ -90,13 +91,13 @@
   <div class="advisor-panel" [class.open]="isAdvisorOpen">
     <div class="advisor-header">
       <div class="advisor-title">
-        <span class="advisor-robot">🤖</span>
+        <span class="advisor-robot"><i class="ri-robot-2-line"></i></span>
         <div>
           <div class="advisor-label">AI Performance Advisor</div>
           <div class="advisor-subtitle">Live system analysis</div>
         </div>
       </div>
-      <button class="advisor-close" (click)="toggleAdvisor()">✕</button>
+      <button class="advisor-close" (click)="toggleAdvisor()"><i class="ri-close-line"></i></button>
     </div>
 
     <!-- Health Score Ring -->
@@ -116,7 +117,8 @@
       <div class="score-meta">
         <div class="score-status" [style.color]="getAdvisorScoreColor()">{{ getAdvisorScoreLabel() }}</div>
         <div class="score-desc">System Health Score</div>
-        <button class="refresh-btn" (click)="systemStats && runAdvisor(systemStats)">↺ Refresh</button>
+        <button class="refresh-btn" (click)="systemStats && runAdvisor(systemStats)"><i class="ri-refresh-line"></i>
+          Refresh</button>
       </div>
     </div>
 
@@ -125,11 +127,11 @@
       <div class="advice-card" *ngFor="let advice of advices" [class.critical]="advice.severity === 'critical'"
         [class.warning]="advice.severity === 'warning'" [class.info]="advice.severity === 'info'"
         [class.good]="advice.severity === 'good'">
-        <div class="advice-icon">{{ advice.icon }}</div>
+        <div class="advice-icon"><i [class]="advice.icon"></i></div>
         <div class="advice-body">
           <div class="advice-title">{{ advice.title }}</div>
           <div class="advice-msg">{{ advice.message }}</div>
-          <div class="advice-action" *ngIf="advice.action">💡 {{ advice.action }}</div>
+          <div class="advice-action" *ngIf="advice.action"><i class="ri-lightbulb-line"></i> {{ advice.action }}</div>
         </div>
         <div class="advice-severity-dot" [class]="advice.severity"></div>
       </div>
@@ -168,7 +170,7 @@
         <!-- CPU Card -->
         <div class="stat-card cpu-card fade-in" *ngIf="widgetVisibility.cpu">
           <div class="card-header">
-            <span class="icon">⚡</span>
+            <span class="icon"><i class="ri-cpu-line"></i></span>
             <h3>CPU</h3>
             <div class="header-values">
               <span class="temp-badge" *ngIf="systemStats.cpu_temp !== null">{{ systemStats.cpu_temp.toFixed(0)
@@ -184,7 +186,7 @@
         <!-- Per-Core Grid -->
         <div class="stat-card cores-card fade-in" *ngIf="widgetVisibility.cores">
           <div class="card-header">
-            <span class="icon">🚥</span>
+            <span class="icon"><i class="ri-server-line"></i></span>
             <h3>Per-Core Activity</h3>
           </div>
           <div class="cores-grid">
@@ -203,7 +205,7 @@
         <!-- RAM Card -->
         <div class="stat-card ram-card fade-in" *ngIf="widgetVisibility.ram">
           <div class="card-header">
-            <span class="icon">🧠</span>
+            <span class="icon"><i class="ri-ram-2-line"></i></span>
             <h3>Memory History</h3>
             <span class="percentage">{{ getMemoryPercentage().toFixed(1) }}%</span>
           </div>
@@ -218,22 +220,22 @@
         <!-- Network Card -->
         <div class="stat-card net-card fade-in" *ngIf="widgetVisibility.net">
           <div class="card-header">
-            <span class="icon">🌐</span>
+            <span class="icon"><i class="ri-global-line"></i></span>
             <h3>Network Traffic</h3>
           </div>
           <div class="chart-container">
             <canvas #netTrafficCanvas></canvas>
           </div>
           <div class="net-stats-compact">
-            <span>⏬ {{ formatBytes(netSpeedIn) }}/s</span>
-            <span>⏫ {{ formatBytes(netSpeedOut) }}/s</span>
+            <span><i class="ri-download-line"></i> {{ formatBytes(netSpeedIn) }}/s</span>
+            <span><i class="ri-upload-line"></i> {{ formatBytes(netSpeedOut) }}/s</span>
           </div>
         </div>
 
         <!-- GPU Card -->
         <div class="stat-card gpu-card fade-in" *ngIf="widgetVisibility.gpu">
           <div class="card-header">
-            <span class="icon">🎮</span>
+            <span class="icon"><i class="ri-gamepad-line"></i></span>
             <h3>GPU Usage</h3>
             <div class="header-values">
               <span class="percentage">{{ systemStats.gpu_usage.toFixed(1) }}%</span>
@@ -248,7 +250,7 @@
         <!-- Connectivity Card -->
         <div class="stat-card conn-card fade-in" *ngIf="widgetVisibility.conn">
           <div class="card-header">
-            <span class="icon">📡</span>
+            <span class="icon"><i class="ri-wifi-line"></i></span>
             <h3>Connectivity</h3>
           </div>
           <div class="conn-stats">
@@ -269,7 +271,7 @@
         <!-- Disk Card -->
         <div class="stat-card disk-card fade-in" *ngIf="widgetVisibility.disk">
           <div class="card-header">
-            <span class="icon">💾</span>
+            <span class="icon"><i class="ri-hard-drive-2-line"></i></span>
             <h3>Disk Activity</h3>
           </div>
           <div class="chart-container">
@@ -284,7 +286,7 @@
         <!-- Hardware Details Card -->
         <div class="stat-card system-card fade-in" *ngIf="widgetVisibility.info">
           <div class="card-header">
-            <span class="icon">🛠️</span>
+            <span class="icon"><i class="ri-information-line"></i></span>
             <h3>System Info</h3>
           </div>
           <div class="system-details">
@@ -306,7 +308,7 @@
         <!-- App Usage Tracking -->
         <div class="stat-card usage-card fade-in" *ngIf="widgetVisibility.usage">
           <div class="card-header">
-            <span class="icon">⏱️</span>
+            <span class="icon"><i class="ri-timer-line"></i></span>
             <h3>App Usage Tracking</h3>
           </div>
           <div class="usage-list">
@@ -323,44 +325,45 @@
         <!-- Processes Card -->
         <div class="stat-card processes-card fade-in" *ngIf="widgetVisibility.processes">
           <div class="card-header">
-            <span class="icon">🚀</span>
+            <span class="icon"><i class="ri-rocket-line"></i></span>
             <h3>Process Controller</h3>
             <div class="proc-actions">
               <div class="search-box">
-                <span class="search-icon">🔍</span>
+                <span class="search-icon"><i class="ri-search-line"></i></span>
                 <input type="text" placeholder="Search by name or PID..." (input)="onSearch($event)">
               </div>
-              <button class="icon-button" [class.active]="showTree" (click)="toggleTree()"
-                title="Toggle Tree View">🌳</button>
+              <button class="icon-button" [class.active]="showTree" (click)="toggleTree()" title="Toggle Tree View"><i
+                  class="ri-organization-chart"></i></button>
             </div>
           </div>
           <div class="process-list">
             <table>
               <thead>
                 <tr>
-                  <th (click)="setSort('name')" class="sortable">Process <span
-                      *ngIf="sortKey==='name'">{{sortDir==='asc'?'↑':'↓'}}</span></th>
-                  <th (click)="setSort('pid')" class="sortable">PID <span
-                      *ngIf="sortKey==='pid'">{{sortDir==='asc'?'↑':'↓'}}</span></th>
-                  <th (click)="setSort('cpu_usage')" class="sortable">CPU% <span
-                      *ngIf="sortKey==='cpu_usage'">{{sortDir==='asc'?'↑':'↓'}}</span></th>
-                  <th (click)="setSort('memory')" class="sortable">RAM <span
-                      *ngIf="sortKey==='memory'">{{sortDir==='asc'?'↑':'↓'}}</span></th>
+                  <th (click)="setSort('name')" class="sortable">Process <span *ngIf="sortKey==='name'"><i
+                        [class]="sortDir==='asc' ? 'ri-arrow-up-line' : 'ri-arrow-down-line'"></i></span></th>
+                  <th (click)="setSort('pid')" class="sortable">PID <span *ngIf="sortKey==='pid'"><i
+                        [class]="sortDir==='asc' ? 'ri-arrow-up-line' : 'ri-arrow-down-line'"></i></span></th>
+                  <th (click)="setSort('cpu_usage')" class="sortable">CPU% <span *ngIf="sortKey==='cpu_usage'"><i
+                        [class]="sortDir==='asc' ? 'ri-arrow-up-line' : 'ri-arrow-down-line'"></i></span></th>
+                  <th (click)="setSort('memory')" class="sortable">RAM <span *ngIf="sortKey==='memory'"><i
+                        [class]="sortDir==='asc' ? 'ri-arrow-up-line' : 'ri-arrow-down-line'"></i></span></th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 <tr *ngFor="let proc of filteredProcesses" [class.favorite]="favorites.has(proc.pid)">
                   <td class="proc-name">
-                    <span class="fav-star" (click)="toggleFavorite(proc.pid)">{{ favorites.has(proc.pid) ? '⭐' : '☆'
-                      }}</span>
+                    <span class="fav-star" (click)="toggleFavorite(proc.pid)"><i
+                        [class]="favorites.has(proc.pid) ? 'ri-star-fill' : 'ri-star-line'"></i></span>
                     <span class="name-text">{{ proc.name }}</span>
                   </td>
                   <td class="proc-pid">{{ proc.pid }}</td>
                   <td class="proc-cpu">{{ proc.cpu_usage.toFixed(1) }}%</td>
                   <td class="proc-mem">{{ formatBytes(proc.memory) }}</td>
                   <td class="proc-ops">
-                    <button class="kill-btn" (click)="killProcess(proc.pid)" title="End Task">❌</button>
+                    <button class="kill-btn" (click)="killProcess(proc.pid)" title="End Task"><i
+                        class="ri-close-circle-line"></i></button>
                   </td>
                 </tr>
               </tbody>
@@ -385,7 +388,7 @@
           <button [class.active]="mgmtSubTab === 'startup'" (click)="setMgmtSubTab('startup')">Startup Apps</button>
         </div>
         <div class="search-box management-search">
-          <span class="search-icon">🔍</span>
+          <span class="search-icon"><i class="ri-search-line"></i></span>
           <input type="text" placeholder="Search services or startup items..." (input)="onMgmtSearch($event)">
         </div>
       </div>
@@ -393,7 +396,7 @@
       <div class="management-container">
         <!-- Widget Visibility Controls -->
         <div class="mgmt-card widget-controls-card fade-in">
-          <h3>🎨 Custom Dashboard</h3>
+          <h3><i class="ri-palette-line"></i> Custom Dashboard</h3>
           <p>Choose which metrics to monitor</p>
           <div class="widget-toggles">
             <label *ngFor="let widgetEntry of widgetVisibility | keyvalue">
@@ -425,7 +428,8 @@
                 </td>
                 <td>
                   <button class="mgmt-btn" [class.running]="svc.status === 'Running'" (click)="toggleService(svc)">
-                    {{ svc.status === 'Running' ? '⏹ Stop' : '▶ Start' }}
+                    <i [class]="svc.status === 'Running' ? 'ri-stop-mini-fill' : 'ri-play-mini-fill'"></i> {{ svc.status
+                    === 'Running' ? 'Stop' : 'Start' }}
                   </button>
                 </td>
               </tr>
@@ -457,34 +461,34 @@
     <!-- Reports View -->
     <section class="reports-view" [class.hidden]="activeTab !== 'reports'">
       <div class="reports-header">
-        <h2>📑 Export & Reporting Center</h2>
+        <h2><i class="ri-folder-chart-line"></i> Export & Reporting Center</h2>
         <p>Professional diagnostics and session logging</p>
       </div>
 
       <div class="reports-grid">
         <div class="report-card fade-in">
-          <div class="report-icon">📄</div>
+          <div class="report-icon"><i class="ri-file-chart-line"></i></div>
           <h3>System Diagnostic</h3>
           <p>Comprehensive PDF report of current hardware and performance status.</p>
           <button class="export-btn" (click)="exportSystemReport()">Export PDF</button>
         </div>
 
         <div class="report-card fade-in">
-          <div class="report-icon">📊</div>
+          <div class="report-icon"><i class="ri-dashboard-2-line"></i></div>
           <h3>Performance Logs</h3>
           <p>Download the last 60 seconds of telemetry data in CSV format.</p>
           <button class="export-btn" (click)="exportPerformanceCSV()">Save CSV</button>
         </div>
 
         <div class="report-card fade-in">
-          <div class="report-icon">🧾</div>
+          <div class="report-icon"><i class="ri-file-list-3-line"></i></div>
           <h3>Hardware Summary</h3>
           <p>Detailed technical specification of all detected system components.</p>
           <button class="export-btn" (click)="exportHardwareSummary()">Export JSON</button>
         </div>
 
         <div class="report-card fade-in">
-          <div class="report-icon">🕓</div>
+          <div class="report-icon"><i class="ri-time-line"></i></div>
           <h3>Reliability Report</h3>
           <p>Focuses on uptime, boot times, and connection stability metrics.</p>
           <button class="export-btn" (click)="exportUptimeReport()">Export PDF</button>
@@ -493,7 +497,8 @@
 
       <div class="reports-footer">
         <div class="info-note">
-          💡 <strong>Tip:</strong> Logs are cleared when the application is closed. Export before exiting.
+          <i class="ri-lightbulb-line"></i> <strong>Tip:</strong> Logs are cleared when the application is closed.
+          Export before exiting.
         </div>
       </div>
     </section>

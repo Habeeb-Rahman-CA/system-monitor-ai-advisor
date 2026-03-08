@@ -1013,7 +1013,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     // ── CPU ────────────────────────────────────────────────────────────────
     if (stats.cpu_usage > 95) {
       advices.push({
-        id: 'cpu_critical', severity: 'critical', icon: '🔥',
+        id: 'cpu_critical', severity: 'critical', icon: 'ri-fire-fill',
         title: 'CPU Maxed Out',
         message: `Your CPU is at ${stats.cpu_usage.toFixed(1)}%. The system is severely bottlenecked.`,
         action: 'Kill high-CPU processes below'
@@ -1021,7 +1021,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       penalty += 35;
     } else if (stats.cpu_usage > 85) {
       advices.push({
-        id: 'cpu_high', severity: 'warning', icon: '⚡',
+        id: 'cpu_high', severity: 'warning', icon: 'ri-cpu-line',
         title: 'High CPU Usage',
         message: `CPU at ${stats.cpu_usage.toFixed(1)}%. Performance may feel sluggish.`,
         action: 'Check Process Controller for CPU hogs'
@@ -1029,7 +1029,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       penalty += 20;
     } else if (stats.cpu_usage < 15) {
       advices.push({
-        id: 'cpu_idle', severity: 'good', icon: '✅',
+        id: 'cpu_idle', severity: 'good', icon: 'ri-check-line',
         title: 'CPU is Healthy',
         message: `CPU usage is only ${stats.cpu_usage.toFixed(1)}%. Plenty of headroom.`
       });
@@ -1038,7 +1038,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     // ── RAM ────────────────────────────────────────────────────────────────
     if (ramPct > 90) {
       advices.push({
-        id: 'ram_critical', severity: 'critical', icon: '🧠',
+        id: 'ram_critical', severity: 'critical', icon: 'ri-ram-2-line',
         title: 'Memory Almost Full',
         message: `RAM at ${ramPct.toFixed(1)}% — only ${this.formatBytes(stats.memory_total - stats.memory_used)} free. Risk of crashes.`,
         action: 'Close unused applications immediately'
@@ -1046,7 +1046,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       penalty += 30;
     } else if (ramPct > 80) {
       advices.push({
-        id: 'ram_high', severity: 'warning', icon: '⚠️',
+        id: 'ram_high', severity: 'warning', icon: 'ri-error-warning-fill',
         title: 'High Memory Usage',
         message: `RAM at ${ramPct.toFixed(1)}%. Consider closing browser tabs or background apps.`,
         action: 'Check which apps use the most RAM below'
@@ -1057,7 +1057,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     // ── Temperature ────────────────────────────────────────────────────────
     if (stats.cpu_temp && stats.cpu_temp > 90) {
       advices.push({
-        id: 'temp_danger', severity: 'critical', icon: '🌡️',
+        id: 'temp_danger', severity: 'critical', icon: 'ri-temp-hot-line',
         title: 'CPU Dangerously Hot',
         message: `Temperature is ${stats.cpu_temp.toFixed(0)}°C. Risk of thermal throttling or hardware damage.`,
         action: 'Reduce workload and check cooling'
@@ -1065,7 +1065,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       penalty += 30;
     } else if (stats.cpu_temp && stats.cpu_temp > 80) {
       advices.push({
-        id: 'temp_high', severity: 'warning', icon: '🌡️',
+        id: 'temp_high', severity: 'warning', icon: 'ri-temp-hot-line',
         title: 'Elevated CPU Temperature',
         message: `CPU is running at ${stats.cpu_temp.toFixed(0)}°C. Consider cleaning fans or reducing tasks.`,
       });
@@ -1078,7 +1078,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       if (disk.total_space === 0) return;
       if (usedPct > 90) {
         advices.push({
-          id: `disk_full_${disk.name}`, severity: 'critical', icon: '💾',
+          id: `disk_full_${disk.name}`, severity: 'critical', icon: 'ri-hard-drive-2-line',
           title: `Disk ${disk.name} Almost Full`,
           message: `${usedPct.toFixed(1)}% used — only ${this.formatBytes(disk.available_space)} remaining.`,
           action: 'Free up space or move files to another drive'
@@ -1086,7 +1086,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
         penalty += 20;
       } else if (usedPct > 80) {
         advices.push({
-          id: `disk_warn_${disk.name}`, severity: 'warning', icon: '💾',
+          id: `disk_warn_${disk.name}`, severity: 'warning', icon: 'ri-hard-drive-2-line',
           title: `Disk ${disk.name} Getting Full`,
           message: `${usedPct.toFixed(1)}% used. Consider cleaning up temporary files.`
         });
@@ -1097,7 +1097,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     // ── Network ────────────────────────────────────────────────────────────
     if (stats.ping > 150) {
       advices.push({
-        id: 'net_lag', severity: 'warning', icon: '🌐',
+        id: 'net_lag', severity: 'warning', icon: 'ri-global-line',
         title: 'High Network Latency',
         message: `Ping is ${stats.ping}ms — web browsing and calls may feel slow.`,
         action: 'Check network or restart router'
@@ -1105,7 +1105,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       penalty += 10;
     } else if (stats.ping === 0) {
       advices.push({
-        id: 'net_down', severity: 'critical', icon: '📡',
+        id: 'net_down', severity: 'critical', icon: 'ri-wifi-off-line',
         title: 'No Internet Connection',
         message: 'Unable to reach the network. Check your connection.',
       });
@@ -1124,7 +1124,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     const chromeRam = chromeProcs.reduce((sum, p) => sum + p.memory, 0);
     if (chromeRam > GB) {
       advices.push({
-        id: 'chrome_ram', severity: 'warning', icon: '🌐',
+        id: 'chrome_ram', severity: 'warning', icon: 'ri-global-line',
         title: 'Chrome Using Too Much RAM',
         message: `Chrome is consuming ${this.formatBytes(chromeRam)}. Close unused tabs to free memory.`,
         action: 'Open Chrome → Menu → More Tools → Task Manager'
@@ -1132,7 +1132,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       penalty += 10;
     } else if (chromeRam > 500 * MB) {
       advices.push({
-        id: 'chrome_ram_warn', severity: 'info', icon: '🌐',
+        id: 'chrome_ram_warn', severity: 'info', icon: 'ri-global-line',
         title: 'Chrome RAM Usage Elevated',
         message: `Chrome is using ${this.formatBytes(chromeRam)}. Closing idle tabs can help.`
       });
@@ -1142,7 +1142,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     const cpuHog = stats.processes.find(p => p.cpu_usage > 50);
     if (cpuHog) {
       advices.push({
-        id: 'proc_cpu_hog', severity: 'warning', icon: '🚀',
+        id: 'proc_cpu_hog', severity: 'warning', icon: 'ri-rocket-line',
         title: 'Process Hogging CPU',
         message: `"${cpuHog.name}" (PID ${cpuHog.pid}) is using ${cpuHog.cpu_usage.toFixed(1)}% CPU.`,
         action: 'Kill it in Process Controller if not needed'
@@ -1156,7 +1156,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       .find(p => p.memory > 1.5 * GB);
     if (ramHog) {
       advices.push({
-        id: 'proc_ram_hog', severity: 'warning', icon: '🧠',
+        id: 'proc_ram_hog', severity: 'warning', icon: 'ri-ram-2-line',
         title: 'High-Memory Process Detected',
         message: `"${ramHog.name}" is using ${this.formatBytes(ramHog.memory)} of RAM.`,
         action: 'Consider restarting or closing this app'
@@ -1167,7 +1167,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     // ── GPU ───────────────────────────────────────────────────────────────
     if (stats.gpu_usage > 95) {
       advices.push({
-        id: 'gpu_maxed', severity: 'warning', icon: '🎮',
+        id: 'gpu_maxed', severity: 'warning', icon: 'ri-gamepad-line',
         title: 'GPU at Maximum Load',
         message: `GPU usage is ${stats.gpu_usage.toFixed(1)}%. Reduce graphics-intensive tasks if performance drops.`
       });
@@ -1177,7 +1177,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     // ── All Good ─────────────────────────────────────────────────────────
     if (advices.filter(a => a.severity !== 'good').length === 0) {
       advices.push({
-        id: 'all_good', severity: 'good', icon: '🎉',
+        id: 'all_good', severity: 'good', icon: 'ri-thumb-up-line',
         title: 'System is Running Great',
         message: 'All metrics are within healthy ranges. No action needed.'
       });
