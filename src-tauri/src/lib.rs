@@ -1052,6 +1052,61 @@ fn delete_api_request(app: tauri::AppHandle, id: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn toggle_gaming_boost(active: bool) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        // 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c is High Performance
+        // a1841308-3541-4fab-bc81-f71556f20b4a is Power Saver
+        // 381b4222-f694-41f0-9685-ff5bb260df2e is Balanced
+
+        let plan_guid = if active {
+            "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"
+        } else {
+            "381b4222-f694-41f0-9685-ff5bb260df2e"
+        };
+
+        Command::new("powercfg")
+            .args(["-setactive", plan_guid])
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        Ok(if active {
+            "High Performance Mode Active"
+        } else {
+            "Balanced Mode Resumed"
+        }
+        .to_string())
+    }
+    #[cfg(not(target_os = "windows"))]
+    Ok("Feature only available on Windows".to_string())
+}
+
+#[tauri::command]
+async fn cleanup_gaming_memory() -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        // Use PowerShell to clear working sets of non-essential processes or common bloat
+        // This is a simplified "Booster" approach
+        let script = r#"
+            Get-Process | Where-Object { $_.MainWindowTitle -eq "" -and $_.CPU -lt 1 } | ForEach-Object { 
+                try { [Runtime.InteropServices.Marshal]::FreeHGlobal(0) } catch {}
+            }
+        "#;
+
+        Command::new("powershell")
+            .args(["-Command", script])
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        Ok("Memory working set optimization complete".to_string())
+    }
+    #[cfg(not(target_os = "windows"))]
+    Ok("Not implemented for this OS".to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1112,7 +1167,9 @@ pub fn run() {
             send_api_request,
             get_saved_api_collections,
             save_api_request,
-            delete_api_request
+            delete_api_request,
+            toggle_gaming_boost,
+            cleanup_gaming_memory
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

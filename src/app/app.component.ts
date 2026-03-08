@@ -233,7 +233,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   showTree = false;
 
   // Management State
-  activeTab: 'dashboard' | 'processes' | 'management' | 'advisor' | 'reports' | 'dev' = 'dashboard';
+  activeTab: 'dashboard' | 'processes' | 'management' | 'advisor' | 'reports' | 'dev' | 'gaming' = 'dashboard';
   lastMgmtRefresh = 0;
   isLoadingMgmt = false;
   mgmtSubTab: 'services' | 'startup' = 'services';
@@ -281,6 +281,16 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   isLoadingEnv = false;
   lastPortsRefresh = 0;
   managementSearchTerm = '';
+
+  // Gaming Performance State
+  isGamingBoostActive = false;
+  fpsValue = 0;
+  lastFrameTime = 0;
+  frameTimeHistory: number[] = new Array(60).fill(0);
+  isOverlayActive = false;
+  isBoosting = false;
+  gamingChart: Chart | null = null;
+  @ViewChild('frameTimeCanvas') frameTimeCanvas!: ElementRef<HTMLCanvasElement>;
 
   // Cached Filtered Lists
   p_filteredProcesses: ProcessInfo[] = [];
@@ -852,12 +862,14 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // --- Management Methods ---
 
-  setTab(tab: 'dashboard' | 'processes' | 'management' | 'advisor' | 'reports' | 'dev') {
+  setTab(tab: 'dashboard' | 'processes' | 'management' | 'advisor' | 'reports' | 'dev' | 'gaming') {
     this.activeTab = tab;
     if (tab === 'management') {
       this.refreshManagementData();
     } else if (tab === 'dev') {
       this.refreshDevData();
+    } else if (tab === 'gaming') {
+      this.initGamingFeatures();
     }
     this.cdr.markForCheck();
   }
@@ -1923,6 +1935,114 @@ Provide only the bullet points, no preamble.`;
   trackByIndex(index: number) { return index; }
   trackById(index: number, item: any) { return item.id; }
   trackByKey(index: number, item: any) { return item.key || index; }
+
+  // Gaming Performance Mode Logic
+  initGamingFeatures() {
+    this.startFpsCounter();
+    setTimeout(() => this.initGamingChart(), 100);
+  }
+
+  startFpsCounter() {
+    let frameCount = 0;
+    let lastTime = performance.now();
+
+    const loop = () => {
+      if (this.activeTab !== 'gaming') return;
+      frameCount++;
+      const now = performance.now();
+      const delta = now - lastTime;
+
+      if (delta >= 1000) {
+        this.fpsValue = Math.round((frameCount * 1000) / delta);
+        frameCount = 0;
+        lastTime = now;
+      }
+
+      // Track frame time (latency)
+      const currentFrameTime = performance.now() - now; // This is a rough app-level jitter measure
+      this.frameTimeHistory.push(delta); // Use delta as inter-frame delay
+      this.frameTimeHistory.shift();
+
+      if (this.gamingChart) {
+        this.gamingChart.data.datasets[0].data = [...this.frameTimeHistory];
+        this.gamingChart.update('none');
+      }
+
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+
+  initGamingChart() {
+    if (!this.frameTimeCanvas) return;
+    if (this.gamingChart) this.gamingChart.destroy();
+
+    this.gamingChart = new Chart(this.frameTimeCanvas.nativeElement, {
+      type: 'line',
+      data: {
+        labels: new Array(60).fill(''),
+        datasets: [{
+          label: 'Frame Time (ms)',
+          data: this.frameTimeHistory,
+          borderColor: '#FCE100',
+          borderWidth: 2,
+          fill: true,
+          backgroundColor: 'rgba(252, 225, 0, 0.1)',
+          tension: 0.4,
+          pointRadius: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { display: false },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+            ticks: { color: '#888', font: { size: 10 } }
+          }
+        },
+        plugins: { legend: { display: false } },
+        animation: { duration: 0 }
+      }
+    });
+  }
+
+  async toggleGamingBoost() {
+    this.isBoosting = true;
+    try {
+      this.isGamingBoostActive = !this.isGamingBoostActive;
+      const res = await invoke<string>('toggle_gaming_boost', { active: this.isGamingBoostActive });
+      console.log(res);
+      if (this.isGamingBoostActive) {
+        // Automatically cleanup memory when boosting
+        await this.cleanupGamingMemory();
+      }
+    } catch (e) {
+      alert("Failed to toggle boost: " + e);
+      this.isGamingBoostActive = !this.isGamingBoostActive;
+    } finally {
+      this.isBoosting = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async cleanupGamingMemory() {
+    try {
+      const res = await invoke<string>('cleanup_gaming_memory');
+      console.log(res);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async toggleOverlay() {
+    this.isOverlayActive = !this.isOverlayActive;
+    // In a real app, this might open a transparent top-most small window
+    // For now, let's use the Mini Mode as our "Hardware Overlay"
+    await this.toggleMiniMode();
+  }
 
   // Diagnostics for the user
   async testExportTrigger() {

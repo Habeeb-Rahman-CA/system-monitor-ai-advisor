@@ -2857,3 +2857,299 @@ h3 {
 .fluent-btn.secondary:hover {
   background: rgba(255, 255, 255, 0.1);
 }
+
+/* ── Gaming Performance View ──────────────────────────── */
+.gaming-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.gaming-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+}
+
+.gaming-title h2 {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.gaming-title h2 i {
+  color: var(--accent-yellow);
+}
+
+.gaming-title p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+.gaming-status-badge {
+  padding: 0.5rem 1rem;
+  background: var(--fluent-layer-2);
+  border: 1px solid var(--fluent-stroke);
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-tertiary);
+  transition: all 0.3s;
+}
+
+.gaming-status-badge.active {
+  background: rgba(252, 225, 0, 0.1);
+  border-color: var(--accent-yellow);
+  color: var(--accent-yellow);
+  box-shadow: 0 0 15px rgba(252, 225, 0, 0.2);
+}
+
+.gaming-nav.active i {
+  color: var(--accent-yellow) !important;
+}
+
+.gaming-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.25rem;
+}
+
+.gaming-card {
+  background: var(--fluent-layer-2);
+  border: 1px solid var(--fluent-stroke-card);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow-4);
+  transition: transform 0.2s;
+}
+
+.gaming-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-8);
+}
+
+/* ── FPS Card ─────────────────────────────────────────── */
+.fps-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: linear-gradient(135deg, var(--fluent-layer-2) 0%, rgba(252, 225, 0, 0.05) 100%);
+  border-top: 3px solid var(--accent-yellow);
+}
+
+.card-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--text-tertiary);
+  margin-bottom: 0.5rem;
+}
+
+.fps-value {
+  font-size: 4rem;
+  font-weight: 800;
+  color: var(--accent-yellow);
+  font-family: 'Segoe UI', monospace;
+  line-height: 1;
+}
+
+.fps-unit {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+}
+
+.fps-stability {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+}
+
+.st-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-red);
+}
+
+.st-dot.solid {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green);
+}
+
+/* ── Boost Card ────────────────────────────────────────── */
+.boost-card {
+  border-top: 3px solid var(--primary);
+}
+
+.boost-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.boost-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.boost-header i {
+  font-size: 1.5rem;
+  color: var(--primary);
+}
+
+.boost-card p {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 1.5rem;
+}
+
+.boost-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.boost-main-btn {
+  background: rgba(96, 205, 255, 0.1);
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  padding: 0.75rem;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  transition: all 0.2s;
+}
+
+.boost-main-btn:hover:not(:disabled) {
+  background: var(--primary);
+  color: #000;
+}
+
+.boost-main-btn.active {
+  background: var(--primary);
+  color: #000;
+  box-shadow: 0 0 15px rgba(96, 205, 255, 0.3);
+}
+
+.boost-secondary-btn {
+  background: transparent;
+  border: 1px solid var(--fluent-divider);
+  color: var(--text-secondary);
+  padding: 0.6rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+.boost-secondary-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+/* ── Chart Card ───────────────────────────────────────── */
+.chart-container-gaming {
+  height: 150px;
+  margin-top: 1rem;
+}
+
+.ms-val {
+  color: var(--accent-yellow) !important;
+  font-family: monospace;
+}
+
+/* ── Overlay Card ──────────────────────────────────────── */
+.overlay-btn {
+  width: 100%;
+  background: var(--fluent-layer-3);
+  border: 1px solid var(--fluent-stroke);
+  color: var(--text-primary);
+  padding: 0.75rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.overlay-btn.active {
+  background: var(--accent-subtle);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* ── Resources Grid ────────────────────────────────────── */
+.gaming-res-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.res-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.res-label {
+  width: 70px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+}
+
+.res-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--fluent-divider);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.res-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: var(--primary);
+  transition: width 0.5s var(--ease-decel);
+}
+
+.res-fill.high {
+  background: var(--accent-red);
+}
+
+.res-val {
+  width: 45px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}

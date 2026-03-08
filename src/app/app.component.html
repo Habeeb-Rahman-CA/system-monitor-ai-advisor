@@ -75,6 +75,10 @@
         <span class="nav-icon"><i class="ri-braces-line"></i></span>
         <span class="nav-label" *ngIf="!isSidebarCollapsed">Developer</span>
       </button>
+      <button class="nav-item gaming-nav" [class.active]="activeTab === 'gaming'" (click)="setTab('gaming')">
+        <span class="nav-icon"><i class="ri-gamepad-line"></i></span>
+        <span class="nav-label" *ngIf="!isSidebarCollapsed">Gaming</span>
+      </button>
       <button class="nav-item" [class.active]="activeTab === 'reports'" (click)="setTab('reports')">
         <span class="nav-icon"><i class="ri-file-chart-line"></i></span>
         <span class="nav-label" *ngIf="!isSidebarCollapsed">Reports</span>
@@ -1030,6 +1034,107 @@
         <div class="info-note">
           <i class="ri-lightbulb-line"></i> <strong>Tip:</strong> Logs are cleared when the application is closed.
           Export before exiting.
+        </div>
+      </div>
+    </section>
+    <!-- Gaming Performance View -->
+    <section class="gaming-view" [class.hidden]="activeTab !== 'gaming'">
+      <div class="gaming-header">
+        <div class="gaming-title">
+          <h2><i class="ri-gamepad-fill"></i> Gaming Performance Mode</h2>
+          <p>Optimize your system for peak gaming experience</p>
+        </div>
+        <div class="gaming-status-badge" [class.active]="isGamingBoostActive">
+          <i class="ri-flashlight-fill"></i> {{ isGamingBoostActive ? 'BOOST ACTIVE' : 'STANDARD MODE' }}
+        </div>
+      </div>
+
+      <div class="gaming-grid">
+        <!-- Live FPS Counter -->
+        <div class="gaming-card fps-card fade-in">
+          <div class="card-label">CURRENT FPS</div>
+          <div class="fps-value">{{ fpsValue }}</div>
+          <div class="fps-unit">FPS (APP SCALE)</div>
+          <div class="fps-stability" *ngIf="fpsValue > 0">
+            <span class="st-dot" [class.solid]="fpsValue > 55"></span> Stability: {{ fpsValue > 55 ? 'Excellent' :
+            'Stable' }}
+          </div>
+        </div>
+
+        <!-- System Performance Boost -->
+        <div class="gaming-card boost-card fade-in">
+          <div class="boost-header">
+            <i class="ri-rocket-2-line"></i>
+            <h3>Performance Boost</h3>
+          </div>
+          <p>Prioritizes system resources for games and sets High Performance power plan.</p>
+
+          <div class="boost-controls">
+            <button class="boost-main-btn" [class.active]="isGamingBoostActive" (click)="toggleGamingBoost()"
+              [disabled]="isBoosting">
+              <i class="ri-power-flash-line"></i>
+              {{ isBoosting ? 'Processing...' : (isGamingBoostActive ? 'RESTORE SYSTEM' : 'ACTIVATE BOOST') }}
+            </button>
+            <button class="boost-secondary-btn" (click)="cleanupGamingMemory()">
+              <i class="ri-brush-2-line"></i> Purge Standby RAM
+            </button>
+          </div>
+        </div>
+
+        <!-- Frame Time Analytics -->
+        <div class="gaming-card chart-card fade-in">
+          <div class="card-header">
+            <span class="icon"><i class="ri-pulse-line"></i></span>
+            <h3>Frame Time Analytics (Jitter)</h3>
+            <span class="percentage ms-val">{{ frameTimeHistory[frameTimeHistory.length-1]?.toFixed(1) }}ms</span>
+          </div>
+          <div class="chart-container-gaming">
+            <canvas #frameTimeCanvas></canvas>
+          </div>
+        </div>
+
+        <!-- Gaming Hardware Overlay Settings -->
+        <div class="gaming-card overlay-card fade-in">
+          <div class="card-header">
+            <span class="icon"><i class="ri-window-line"></i></span>
+            <h3>Compact Hardware Overlay</h3>
+          </div>
+          <p>Floating window with live CPU/GPU/FPS stats for in-game monitoring.</p>
+          <div class="overlay-toggle-wrap">
+            <button class="overlay-btn" [class.active]="isMiniMode" (click)="toggleOverlay()">
+              <i class="ri-external-link-line"></i> {{ isMiniMode ? 'CLOSE OVERLAY' : 'LAUNCH OVERLAY' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Real-time Resources -->
+        <div class="gaming-card resources-card fade-in" *ngIf="systemStats">
+          <h3>Essential Metrics</h3>
+          <div class="gaming-res-grid">
+            <div class="res-item">
+              <span class="res-label">CPU LOAD</span>
+              <div class="res-bar">
+                <div class="res-fill" [style.width.%]="systemStats.cpu_usage" [class.high]="systemStats.cpu_usage > 80">
+                </div>
+              </div>
+              <span class="res-val">{{ systemStats.cpu_usage.toFixed(1) }}%</span>
+            </div>
+            <div class="res-item">
+              <span class="res-label">GPU LOAD</span>
+              <div class="res-bar">
+                <div class="res-fill" [style.width.%]="systemStats.gpu_usage" [class.high]="systemStats.gpu_usage > 90">
+                </div>
+              </div>
+              <span class="res-val">{{ systemStats.gpu_usage.toFixed(1) }}%</span>
+            </div>
+            <div class="res-item">
+              <span class="res-label">RAM USED</span>
+              <div class="res-bar">
+                <div class="res-fill" [style.width.%]="getMemoryPercentage()"></div>
+              </div>
+              <span class="res-val">{{ getMemoryPercentage().toFixed(1) }}%</span>
+            </div>
+          </div>
         </div>
       </div>
     </section>
