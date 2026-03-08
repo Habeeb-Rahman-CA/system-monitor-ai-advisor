@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit, ViewChildren, QueryList } from "@angular/core";
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit, ViewChildren, QueryList, ChangeDetectionStrategy, ChangeDetectorRef } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { invoke } from "@tauri-apps/api/core";
@@ -96,8 +96,10 @@ interface SystemStats {
   imports: [CommonModule, FormsModule],
   templateUrl: "./app.component.html",
   styleUrl: "./app.component.css",
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
+  constructor(private cdr: ChangeDetectorRef) { }
   @ViewChild('cpuCanvas') cpuCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('memoryCanvas') memoryCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChildren('coreCanvas') coreCanvases!: QueryList<ElementRef<HTMLCanvasElement>>;
@@ -223,13 +225,17 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
         if (this.systemStats) this.runAdvisor(this.systemStats);
         this.advisorLastRun = now;
       }
+      this.cdr.markForCheck(); // Trigger manual CD update
     }, 1000);
   }
 
   updateCaches() {
-    this.updateFilteredProcesses();
-    this.updateFilteredServices();
-    this.updateFilteredStartupApps();
+    if (this.activeTab === 'dashboard') {
+      this.updateFilteredProcesses();
+    } else if (this.activeTab === 'management') {
+      this.updateFilteredServices();
+      this.updateFilteredStartupApps();
+    }
   }
 
   updateFilteredProcesses() {
@@ -269,6 +275,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     } else {
       this.p_filteredProcesses = list.slice(0, 50);
     }
+    this.cdr.markForCheck();
   }
 
   updateFilteredServices() {
@@ -1368,6 +1375,16 @@ Provide only the bullet points, no preamble.`;
   }
 
   getSelectedModelLabel(): string {
-    return this.AVAILABLE_MODELS.find(m => m.id === this.selectedModel)?.label ?? this.selectedModel;
+    const m = this.AVAILABLE_MODELS.find(m => m.id === this.selectedModel);
+    return m ? m.label : this.selectedModel;
   }
+
+  // --- TrackBy Functions for Performance ---
+  trackByAlert(index: number, item: Alert) { return item.id; }
+  trackByAdvice(index: number, item: Advice) { return item.id; }
+  trackByPid(index: number, item: ProcessInfo) { return item.pid; }
+  trackByName(index: number, item: { name: string }) { return item.name; }
+  trackByCommand(index: number, item: StartupInfo) { return item.command; }
+  trackByIndex(index: number) { return index; }
+  trackByKey(index: number, item: any) { return item.key; }
 }

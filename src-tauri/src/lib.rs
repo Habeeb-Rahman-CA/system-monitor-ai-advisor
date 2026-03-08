@@ -1,7 +1,7 @@
 use serde::Serialize;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use sysinfo::{Components, Disks, Networks, System};
-use tauri::State;
+use tauri::{Manager, State};
 
 #[derive(Serialize)]
 struct DiskInfo {
@@ -66,18 +66,41 @@ struct SystemStats {
 
 pub struct AppState {
     sys: Mutex<System>,
+    disks: Mutex<Disks>,
+    networks: Mutex<Networks>,
+    components: Mutex<Components>,
+    last_hardware_refresh: Mutex<std::time::Instant>,
+
+    // Background metrics to prevent blocking main command
+    wifi_signal: Mutex<u32>,
+    ping: Mutex<u32>,
+
     last_disk_total_read: Mutex<u64>,
     last_disk_total_write: Mutex<u64>,
     last_sample_time: Mutex<std::time::Instant>,
 }
 
 #[tauri::command]
-fn get_system_stats(state: State<'_, AppState>) -> SystemStats {
+fn get_system_stats(state: State<'_, Arc<AppState>>) -> SystemStats {
     let mut sys = state.sys.lock().unwrap();
+    let now = std::time::Instant::now();
 
-    // System metrics
+    // 1. Refresh System/Memory/Processes (Relatively fast)
     sys.refresh_cpu_all();
     sys.refresh_memory();
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+    // 2. Throttled Hardware Refresh (Every 10 seconds)
+    {
+        let mut last_hw = state.last_hardware_refresh.lock().unwrap();
+        // Check if we need to refresh (either 10s passed or first run where list is empty)
+        if now.duration_since(*last_hw).as_secs() >= 10 {
+            state.disks.lock().unwrap().refresh(false);
+            state.networks.lock().unwrap().refresh(false);
+            state.components.lock().unwrap().refresh(false);
+            *last_hw = now;
+        }
+    }
 
     let cpu_usage = sys.global_cpu_usage();
     let cpu_cores = sys.cpus().len();
@@ -87,18 +110,16 @@ fn get_system_stats(state: State<'_, AppState>) -> SystemStats {
         .get(0)
         .map(|c| c.brand().to_string())
         .unwrap_or_else(|| "Unknown".to_string());
-    let cpu_arch = System::cpu_arch();
     let cpu_freq = sys.cpus().get(0).map(|c| c.frequency()).unwrap_or(0);
 
     let memory_used = sys.used_memory();
     let memory_total = sys.total_memory();
-    let os_name = System::name().unwrap_or_else(|| "Unknown".to_string());
-    let os_version = System::os_version().unwrap_or_else(|| "Unknown".to_string());
-    let uptime = System::uptime();
 
-    // Disks metrics
-    let disks_info = Disks::new_with_refreshed_list();
-    let disks = disks_info
+    // 3. Collect disks from CACHE
+    let disks = state
+        .disks
+        .lock()
+        .unwrap()
         .iter()
         .map(|disk| DiskInfo {
             name: disk.name().to_string_lossy().into_owned(),
@@ -108,31 +129,23 @@ fn get_system_stats(state: State<'_, AppState>) -> SystemStats {
         })
         .collect();
 
-    // Network metrics
-    let networks = Networks::new_with_refreshed_list();
+    // 4. Collect network from CACHE
     let mut net_received = 0;
     let mut net_transmitted = 0;
-    for (_interface_name, data) in &networks {
+    for (_name, data) in state.networks.lock().unwrap().iter() {
         net_received += data.total_received();
         net_transmitted += data.total_transmitted();
     }
 
     let cpus: Vec<f32> = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).collect();
 
-    let components = Components::new_with_refreshed_list();
+    // 5. Collect temp/gpu from CACHE
     let mut cpu_temp = None;
-    let battery_level = None;
     let mut gpu_name = "N/A".to_string();
-
-    for c in &components {
+    for c in state.components.lock().unwrap().iter() {
         let label = c.label().to_lowercase();
-        if cpu_temp.is_none()
-            && (label.contains("cpu") || label.contains("package") || label.contains("core"))
-        {
+        if cpu_temp.is_none() && (label.contains("cpu") || label.contains("package")) {
             cpu_temp = c.temperature();
-        }
-        if label.contains("battery") {
-            // Placeholder for battery
         }
         if (label.contains("gpu") || label.contains("nvidia") || label.contains("amd"))
             && gpu_name == "N/A"
@@ -141,21 +154,16 @@ fn get_system_stats(state: State<'_, AppState>) -> SystemStats {
         }
     }
 
-    // Processes metrics
-    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-
-    // Disk Speed Calculation helper (using processes as a proxy for total I/O if global is unavailable)
+    // 6. Disk Speed
     let mut current_disk_read_total = 0;
     let mut current_disk_write_total = 0;
-
-    let mut processes: Vec<ProcessInfo> = sys
+    let processes: Vec<ProcessInfo> = sys
         .processes()
         .iter()
         .map(|(pid, process)| {
-            let disk_usage = process.disk_usage();
-            current_disk_read_total += disk_usage.total_read_bytes;
-            current_disk_write_total += disk_usage.total_written_bytes;
-
+            let du = process.disk_usage();
+            current_disk_read_total += du.total_read_bytes;
+            current_disk_write_total += du.total_written_bytes;
             ProcessInfo {
                 name: process.name().to_string_lossy().into_owned(),
                 pid: pid.as_u32(),
@@ -166,8 +174,6 @@ fn get_system_stats(state: State<'_, AppState>) -> SystemStats {
         })
         .collect();
 
-    // Calculate disk speed
-    let now = std::time::Instant::now();
     let mut last_time = state.last_sample_time.lock().unwrap();
     let mut last_read = state.last_disk_total_read.lock().unwrap();
     let mut last_write = state.last_disk_total_write.lock().unwrap();
@@ -188,59 +194,41 @@ fn get_system_stats(state: State<'_, AppState>) -> SystemStats {
     *last_read = current_disk_read_total;
     *last_write = current_disk_write_total;
 
-    // Advanced Metrics - Ping
-    let ping = get_latency();
-
-    // Advanced Metrics - WiFi
-    let wifi_signal = get_wifi_signal();
-
-    // Advanced Metrics - GPU (Placeholder for now, will attempt query)
-    let (gpu_usage, vram_used, vram_total) = get_gpu_metrics(&gpu_name);
-
-    // Sort processes
-    // Don't truncate manually here, let the frontend handle filtering/searching
-    processes.sort_by(|a, b| {
-        b.cpu_usage
-            .partial_cmp(&a.cpu_usage)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-
     SystemStats {
         cpu_usage,
         cpu_cores,
         physical_cores,
         cpu_model,
-        cpu_arch,
+        cpu_arch: System::cpu_arch(),
         cpu_freq,
         cpus,
         cpu_temp,
         memory_used,
         memory_total,
-        os_name,
-        os_version,
-        uptime,
+        os_name: System::name().unwrap_or_default(),
+        os_version: System::os_version().unwrap_or_default(),
+        uptime: System::uptime(),
         disks,
         net_received,
         net_transmitted,
         processes,
         gpu_name,
-        gpu_usage,
-        vram_used,
-        vram_total,
-        battery_level,
+        gpu_usage: 0.0,
+        vram_used: 0,
+        vram_total: 0,
+        battery_level: None,
         disk_read_speed,
         disk_write_speed,
-        ping,
-        wifi_signal,
+        ping: *state.ping.lock().unwrap(),
+        wifi_signal: *state.wifi_signal.lock().unwrap(),
     }
 }
 
 fn get_latency() -> u32 {
     let now = std::time::Instant::now();
-    // Using a quick TCP connect to 8.8.8.8:53 (Google DNS) as a latency measure
     if let Ok(_) = std::net::TcpStream::connect_timeout(
         &"8.8.8.8:53".parse().unwrap(),
-        std::time::Duration::from_millis(500),
+        std::time::Duration::from_millis(400),
     ) {
         now.elapsed().as_millis() as u32
     } else {
@@ -252,18 +240,19 @@ fn get_wifi_signal() -> u32 {
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
-        let output = Command::new("netsh")
+        if let Ok(out) = Command::new("netsh")
             .args(&["wlan", "show", "interfaces"])
-            .output();
-
-        if let Ok(out) = output {
+            .output()
+        {
             let s = String::from_utf8_lossy(&out.stdout);
             for line in s.lines() {
                 if line.contains("Signal") {
-                    if let Some(pct_str) = line.split(':').last() {
-                        if let Ok(pct) = pct_str.trim().trim_end_matches('%').parse::<u32>() {
-                            return pct;
-                        }
+                    if let Some(pct) = line
+                        .split(':')
+                        .last()
+                        .and_then(|p| p.trim().trim_end_matches('%').parse::<u32>().ok())
+                    {
+                        return pct;
                     }
                 }
             }
@@ -272,15 +261,8 @@ fn get_wifi_signal() -> u32 {
     0
 }
 
-fn get_gpu_metrics(_name: &str) -> (f32, u64, u64) {
-    // This is OS and hardware specific.
-    // On Windows, one could use WMI or Performance Counters.
-    // For now, let's try a simple fallback.
-    (0.0, 0, 0)
-}
-
 #[tauri::command]
-fn kill_process(state: State<'_, AppState>, pid: u32) -> Result<(), String> {
+fn kill_process(state: State<'_, Arc<AppState>>, pid: u32) -> Result<(), String> {
     let sys = state.sys.lock().unwrap();
     if let Some(process) = sys.process(sysinfo::Pid::from(pid as usize)) {
         if process.kill() {
@@ -304,11 +286,10 @@ fn get_services() -> Vec<ServiceInfo> {
                 "Get-Service | Select-Object Name, DisplayName, Status | ConvertTo-Json",
             ])
             .output();
-
         if let Ok(out) = output {
             let s = String::from_utf8_lossy(&out.stdout);
-            if let Ok(services) = serde_json::from_str::<serde_json::Value>(&s) {
-                if let Some(arr) = services.as_array() {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
+                if let Some(arr) = v.as_array() {
                     return arr
                         .iter()
                         .map(|v| ServiceInfo {
@@ -347,7 +328,6 @@ fn control_service(name: String, action: String) -> Result<(), String> {
                 ),
             ])
             .output();
-
         if output.is_ok() {
             return Ok(());
         }
@@ -360,14 +340,11 @@ fn get_startup_apps() -> Vec<StartupInfo> {
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
-        let output = Command::new("powershell")
-            .args(&["-Command", "Get-CimInstance Win32_StartupCommand | Select-Object Name, Command, Location | ConvertTo-Json"])
-            .output();
-
+        let output = Command::new("powershell").args(&["-Command", "Get-CimInstance Win32_StartupCommand | Select-Object Name, Command, Location | ConvertTo-Json"]).output();
         if let Ok(out) = output {
             let s = String::from_utf8_lossy(&out.stdout);
-            if let Ok(apps) = serde_json::from_str::<serde_json::Value>(&s) {
-                if let Some(arr) = apps.as_array() {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
+                if let Some(arr) = v.as_array() {
                     return arr
                         .iter()
                         .map(|v| StartupInfo {
@@ -376,7 +353,7 @@ fn get_startup_apps() -> Vec<StartupInfo> {
                             location: v["Location"].as_str().unwrap_or("").to_string(),
                         })
                         .collect();
-                } else if let Some(obj) = apps.as_object() {
+                } else if let Some(obj) = v.as_object() {
                     return vec![StartupInfo {
                         name: obj["Name"].as_str().unwrap_or("").to_string(),
                         command: obj["Command"].as_str().unwrap_or("").to_string(),
@@ -389,22 +366,51 @@ fn get_startup_apps() -> Vec<StartupInfo> {
     vec![]
 }
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+    format!("Hello, {}!", name)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .manage(AppState {
-            sys: Mutex::new(System::new_all()),
-            last_disk_total_read: Mutex::new(0),
-            last_disk_total_write: Mutex::new(0),
-            last_sample_time: Mutex::new(std::time::Instant::now()),
-        })
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            let app_state = Arc::new(AppState {
+                sys: Mutex::new(System::new()),
+                disks: Mutex::new(Disks::new()),
+                networks: Mutex::new(Networks::new()),
+                components: Mutex::new(Components::new()),
+                last_hardware_refresh: Mutex::new(
+                    std::time::Instant::now() - std::time::Duration::from_secs(3600),
+                ),
+                wifi_signal: Mutex::new(100),
+                ping: Mutex::new(0),
+                last_disk_total_read: Mutex::new(0),
+                last_disk_total_write: Mutex::new(0),
+                last_sample_time: Mutex::new(std::time::Instant::now()),
+            });
+
+            app.manage(app_state.clone());
+
+            // Background Thread for Slow Metrics
+            let thread_state = app_state.clone();
+            std::thread::spawn(move || loop {
+                let wifi = get_wifi_signal();
+                let latency = get_latency();
+                {
+                    if let Ok(mut ws) = thread_state.wifi_signal.lock() {
+                        *ws = wifi;
+                    }
+                    if let Ok(mut ps) = thread_state.ping.lock() {
+                        *ps = latency;
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_secs(5));
+            });
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             get_system_stats,

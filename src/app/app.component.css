@@ -5,6 +5,7 @@
   overflow: hidden;
   background: var(--bg-color);
   transition: background 0.5s ease;
+  will-change: background;
 }
 
 .hidden {
@@ -24,6 +25,7 @@
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1000;
   padding-top: 38px;
+  will-change: width;
   /* Below titlebar */
 }
 
@@ -111,6 +113,23 @@
 
 .theme-toggle:hover {
   transform: rotate(15deg) scale(1.1);
+}
+
+/* Layer Promotion for animations */
+.pulse,
+.spin,
+.fade-in,
+.advisor-fab {
+  will-change: transform, opacity;
+}
+
+/* Optimize Rendering */
+.stat-card,
+.advisor-panel,
+.sidebar,
+.nav-item {
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 /* ── Advisor FAB button ─────────────────────────────────── */
