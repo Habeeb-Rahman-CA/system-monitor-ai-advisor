@@ -4032,3 +4032,342 @@ h3 {
   background: var(--primary);
   color: #000;
 }
+
+/* ── Power & Battery Deep Monitoring ────────────────── */
+.battery-deep-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.bat-main-display {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.25rem;
+  background: var(--fluent-layer-3);
+  border-radius: 12px;
+  border: 1px solid var(--fluent-divider);
+}
+
+.bat-visual {
+  position: relative;
+  width: 60px;
+  height: 100px;
+  border: 3px solid var(--text-secondary);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.bat-visual::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 25px;
+  height: 8px;
+  background: var(--text-secondary);
+  border-radius: 4px 4px 0 0;
+}
+
+.bat-level-fill {
+  width: 100%;
+  background: var(--accent-green);
+  border-radius: 4px;
+  transition: height 0.5s var(--ease-decel), background 0.3s;
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  right: 4px;
+  width: calc(100% - 8px);
+}
+
+.bat-level-fill.warning {
+  background: var(--accent-yellow);
+}
+
+.bat-level-fill.critical {
+  background: var(--accent-red);
+}
+
+.bat-charging-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2rem;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  z-index: 2;
+}
+
+.bat-text-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bat-pct {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.bat-status-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-green);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.bat-status-label.discharging {
+  color: var(--text-secondary);
+}
+
+.bat-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.bat-detail-item {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--fluent-divider);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bat-detail-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+.bat-detail-val {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.bat-health-bar-container {
+  height: 4px;
+  background: var(--fluent-divider);
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.bat-health-fill {
+  height: 100%;
+  background: var(--accent-blue);
+  transition: width 0.5s;
+}
+
+/* -- Health & Uptime Card ------------------------------------ */
+.health-uptime-card .card-header {
+  margin-bottom: 1.5rem;
+}
+
+.health-badge {
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(108, 203, 95, 0.1);
+  color: var(--accent-green);
+  margin-left: auto;
+}
+
+.health-badge.good {
+  background: rgba(108, 203, 95, 0.1);
+  color: #6CCB5F;
+}
+
+.health-badge.warning {
+  background: rgba(255, 215, 0, 0.1);
+  color: #FFD700;
+}
+
+.health-badge.critical {
+  background: rgba(255, 94, 94, 0.1);
+  color: #FF5E5E;
+}
+
+.health-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.health-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.h-label {
+  font-size: 0.65rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.h-value-big {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+}
+
+.health-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.h-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.h-stat-label {
+  font-size: 0.6rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+
+.h-stat-val {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.h-stat-val.alert {
+  color: var(--accent-red);
+}
+
+.health-bar-container {
+  height: 6px;
+  background: var(--fluent-stroke);
+  border-radius: 3px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+.health-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s var(--ease-decel), background 0.3s;
+}
+
+.health-status-text {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* -- Performance View ---------------------------------------- */
+.performance-view {
+  padding-bottom: 3rem;
+}
+
+.performance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding: 0.5rem;
+}
+
+.perf-title-row h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+  color: var(--text-primary);
+}
+
+.perf-title-row p {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+}
+
+.perf-stats-minimal {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.p-min-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.perf-badge-val {
+  font-family: 'Segoe UI', monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--accent-subtle);
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  margin-left: auto;
+}
+
+.performance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+  gap: 1.5rem;
+}
+
+.timeline-card {
+  padding: 1.25rem;
+  min-height: 280px;
+}
+
+.timeline-card .chart-container {
+  height: 180px;
+  margin-top: 1rem;
+}
+
+.net-speed-mini,
+.disk-speed-mini {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.net-speed-mini .down,
+.disk-speed-mini .read {
+  color: #00f2fe;
+}
+
+.net-speed-mini .up,
+.disk-speed-mini .write {
+  color: #4facfe;
+}
+
+.disk-speed-mini .read {
+  color: #ff5e5e;
+}
+
+.disk-speed-mini .write {
+  color: #ffcc00;
+}

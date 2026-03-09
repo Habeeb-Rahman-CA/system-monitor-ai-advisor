@@ -44,6 +44,16 @@ interface ComponentInfo {
   critical_temp: number | null;
 }
 
+interface BatteryStats {
+  percentage: number;
+  is_charging: boolean;
+  status: string;
+  time_remaining: number | null;
+  health: number | null;
+  power_usage: number | null;
+  cycle_count: number | null;
+}
+
 interface ServiceInfo {
   name: string;
   display_name: string;
@@ -177,7 +187,7 @@ interface SystemStats {
   gpu_fan_speed: number | null;
   vram_used: number;
   vram_total: number;
-  battery_level: number | null;
+  battery: BatteryStats | null;
   disk_read_speed: number;
   disk_write_speed: number;
   ping: number;
@@ -190,6 +200,9 @@ interface SystemStats {
   sensors: ComponentInfo[];
   local_ip: string;
   active_connections: number;
+  last_boot_time: number;
+  health_score: number;
+  crash_reports_count: number;
 }
 
 @Component({
@@ -251,7 +264,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   showTree = false;
 
   // Management State
-  activeTab: 'dashboard' | 'processes' | 'management' | 'advisor' | 'reports' | 'dev' | 'gaming' = 'dashboard';
+  activeTab: 'dashboard' | 'performance' | 'processes' | 'management' | 'advisor' | 'reports' | 'dev' | 'gaming' = 'dashboard';
   lastMgmtRefresh = 0;
   isLoadingMgmt = false;
   mgmtSubTab: 'services' | 'startup' = 'services';
@@ -367,6 +380,9 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     processes: true
   };
 
+  publicIp: string = 'Detecting...';
+
+
   ngOnInit() {
     this.interval = setInterval(() => {
       this.fetchStats();
@@ -381,7 +397,9 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       }
       this.cdr.markForCheck(); // Trigger manual CD update
     }, 1000);
+    this.fetchPublicIp();
   }
+
 
   updateCaches() {
     if (this.activeTab === 'dashboard') {
@@ -785,6 +803,24 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     return ((disk.total_space - disk.available_space) / disk.total_space) * 100;
   }
 
+  formatTimestamp(timestamp: number): string {
+    if (!timestamp) return 'Unknown';
+    return new Date(timestamp * 1000).toLocaleString();
+  }
+
+  getHealthColor(score: number): string {
+    if (score > 80) return '#6CCB5F';
+    if (score > 60) return '#FFD700';
+    return '#FF5E5E';
+  }
+
+  getHealthStatusMessage(score: number): string {
+    if (score > 90) return "System is in peak condition.";
+    if (score > 80) return "Healthy but under normal load.";
+    if (score > 60) return "Warning: Some performance issues detected.";
+    return "Action Required: Take a look at your system!";
+  }
+
   getMemoryPercentage(): number {
     if (!this.systemStats) return 0;
     return (this.systemStats.memory_used / this.systemStats.memory_total) * 100;
@@ -880,7 +916,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // --- Management Methods ---
 
-  setTab(tab: 'dashboard' | 'processes' | 'management' | 'advisor' | 'reports' | 'dev' | 'gaming') {
+  setTab(tab: 'dashboard' | 'performance' | 'processes' | 'management' | 'advisor' | 'reports' | 'dev' | 'gaming') {
     this.activeTab = tab;
     if (tab === 'management') {
       this.refreshManagementData();
@@ -888,6 +924,8 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       this.refreshDevData();
     } else if (tab === 'gaming') {
       this.initGamingFeatures();
+    } else if (tab === 'performance') {
+      setTimeout(() => this.updateCharts(), 50);
     }
     this.cdr.markForCheck();
   }
@@ -1586,6 +1624,24 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   async closeWindow() {
     await appWindow.close();
+  }
+
+  formatBatteryTime(seconds: number | null | undefined): string {
+    if (!seconds) return 'Calculating...';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  }
+
+  async fetchPublicIp() {
+    try {
+      const response = await fetch('https://api.ipify.org?format=json');
+      const data = await response.json();
+      this.publicIp = data.ip;
+    } catch (e) {
+      this.publicIp = 'Unavailable';
+    }
   }
 
   // ── AI Performance Advisor ─────────────────────────────────────────────

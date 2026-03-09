@@ -63,9 +63,9 @@
         <span class="nav-icon"><i class="ri-dashboard-2-line"></i></span>
         <span class="nav-label" *ngIf="!isSidebarCollapsed">Dashboard</span>
       </button>
-      <button class="nav-item" [class.active]="activeTab === 'processes'" (click)="setTab('processes')">
-        <span class="nav-icon"><i class="ri-cpu-line"></i></span>
-        <span class="nav-label" *ngIf="!isSidebarCollapsed">Processes</span>
+      <button class="nav-item" [class.active]="activeTab === 'performance'" (click)="setTab('performance')">
+        <span class="nav-icon"><i class="ri-pulse-line"></i></span>
+        <span class="nav-label" *ngIf="!isSidebarCollapsed">Performance</span>
       </button>
       <button class="nav-item" [class.active]="activeTab === 'management'" (click)="setTab('management')">
         <span class="nav-icon"><i class="ri-settings-3-line"></i></span>
@@ -388,18 +388,62 @@
           </div>
         </div>
 
-        <!-- Network Card -->
-        <div class="stat-card net-card fade-in" *ngIf="widgetVisibility.net">
+        <!-- Network Deep Monitor Card -->
+        <div class="stat-card net-deep-card fade-in" *ngIf="widgetVisibility.net && systemStats">
           <div class="card-header">
-            <span class="icon"><i class="ri-global-line"></i></span>
-            <h3>Network Traffic</h3>
+            <span class="icon" [style.color]="'#FFD700'"><i class="ri-global-line"></i></span>
+            <h3>Network Deep Monitor</h3>
+            <div class="wifi-bar-set" *ngIf="systemStats.wifi_signal > 0">
+              <div class="wifi-bar" [class.active]="systemStats.wifi_signal > 0"
+                [class.strong]="systemStats.wifi_signal > 25"></div>
+              <div class="wifi-bar" [class.active]="systemStats.wifi_signal > 25"
+                [class.strong]="systemStats.wifi_signal > 50"></div>
+              <div class="wifi-bar" [class.active]="systemStats.wifi_signal > 50"
+                [class.strong]="systemStats.wifi_signal > 75"></div>
+              <div class="wifi-bar" [class.active]="systemStats.wifi_signal > 75"
+                [class.strong]="systemStats.wifi_signal > 90"></div>
+            </div>
           </div>
-          <div class="chart-container">
+
+          <div class="net-transfer-grid">
+            <div class="transfer-item down">
+              <span class="trans-label">Download Speed</span>
+              <span class="trans-val">{{ formatBytes(netSpeedIn) }}/s</span>
+              <div class="trans-total">
+                <i class="ri-download-cloud-2-line"></i> {{ formatBytes(systemStats.net_received) }} Total
+              </div>
+            </div>
+            <div class="transfer-item up">
+              <span class="trans-label">Upload Speed</span>
+              <span class="trans-val">{{ formatBytes(netSpeedOut) }}/s</span>
+              <div class="trans-total">
+                <i class="ri-upload-cloud-2-line"></i> {{ formatBytes(systemStats.net_transmitted) }} Total
+              </div>
+            </div>
+          </div>
+
+          <div class="net-info-grid">
+            <div class="net-info-box">
+              <span class="info-label">Local IP</span>
+              <span class="info-val">{{ systemStats.local_ip }}</span>
+            </div>
+            <div class="net-info-box">
+              <span class="info-label">Public IP <button class="pub-ip-btn"
+                  (click)="fetchPublicIp()">Refresh</button></span>
+              <span class="info-val">{{ publicIp }}</span>
+            </div>
+            <div class="net-info-box">
+              <span class="info-label">Connections</span>
+              <span class="info-val">{{ systemStats.active_connections }} Active</span>
+            </div>
+            <div class="net-info-box">
+              <span class="info-label">Ping</span>
+              <span class="info-val" [class.critical]="systemStats.ping > 150">{{ systemStats.ping }} ms</span>
+            </div>
+          </div>
+
+          <div class="chart-container-small" style="height: 100px;">
             <canvas #netTrafficCanvas></canvas>
-          </div>
-          <div class="net-stats-compact">
-            <span><i class="ri-download-line"></i> {{ formatBytes(netSpeedIn) }}/s</span>
-            <span><i class="ri-upload-line"></i> {{ formatBytes(netSpeedOut) }}/s</span>
           </div>
         </div>
 
@@ -457,26 +501,6 @@
           </div>
         </div>
 
-        <!-- Connectivity Card -->
-        <div class="stat-card conn-card fade-in" *ngIf="widgetVisibility.conn">
-          <div class="card-header">
-            <span class="icon"><i class="ri-wifi-line"></i></span>
-            <h3>Connectivity</h3>
-          </div>
-          <div class="conn-stats">
-            <div class="conn-item">
-              <span class="label">Ping (Latency)</span>
-              <span class="value">{{ systemStats.ping }} ms</span>
-            </div>
-            <div class="conn-item">
-              <span class="label">WiFi Signal</span>
-              <span class="value">{{ systemStats.wifi_signal }}%</span>
-            </div>
-          </div>
-          <div class="chart-container-small">
-            <canvas #pingCanvas></canvas>
-          </div>
-        </div>
 
         <!-- Disk Performance Dashboard Card -->
         <div class="stat-card disk-perf-card fade-in" *ngIf="widgetVisibility.disk">
@@ -562,11 +586,101 @@
           </div>
         </div>
 
+        <!-- Power & Battery Dashboard -->
+        <div class="stat-card battery-deep-card fade-in" *ngIf="widgetVisibility.info && systemStats?.battery">
+          <div class="card-header">
+            <span class="icon" [style.color]="'#6CCB5F'"><i class="ri-battery-2-charge-line"></i></span>
+            <h3>Power & Battery</h3>
+            <span class="disk-health-badge" *ngIf="systemStats?.battery?.is_charging"
+              style="background: rgba(108, 203, 95, 0.1); color: var(--accent-green);">Charging</span>
+          </div>
+
+          <div class="bat-main-display">
+            <div class="bat-visual">
+              <div class="bat-level-fill" [style.height.%]="systemStats?.battery?.percentage"
+                [class.warning]="(systemStats?.battery?.percentage ?? 0) < 25"
+                [class.critical]="(systemStats?.battery?.percentage ?? 0) < 15">
+              </div>
+              <i class="ri-flashlight-fill bat-charging-icon" *ngIf="systemStats?.battery?.is_charging"></i>
+            </div>
+            <div class="bat-text-info">
+              <span class="bat-pct">{{ systemStats?.battery?.percentage?.toFixed(0) }}%</span>
+              <span class="bat-status-label" [class.discharging]="!systemStats?.battery?.is_charging">
+                {{ systemStats?.battery?.status }}
+              </span>
+            </div>
+          </div>
+
+          <div class="bat-details-grid">
+            <div class="bat-detail-item" *ngIf="systemStats?.battery?.time_remaining">
+              <span class="bat-detail-label">{{ systemStats?.battery?.is_charging ? 'Time to Full' : 'Time Remaining'
+                }}</span>
+              <span class="bat-detail-val">{{ formatBatteryTime(systemStats?.battery?.time_remaining) }}</span>
+            </div>
+            <div class="bat-detail-item" *ngIf="systemStats?.battery?.power_usage !== null">
+              <span class="bat-detail-label">Power Usage</span>
+              <span class="bat-detail-val">{{ systemStats?.battery?.power_usage?.toFixed(2) }} W</span>
+            </div>
+            <div class="bat-detail-item" *ngIf="systemStats?.battery?.health !== null">
+              <span class="bat-detail-label">Battery Health</span>
+              <span class="bat-detail-val">{{ systemStats?.battery?.health?.toFixed(1) }}%</span>
+              <div class="bat-health-bar-container">
+                <div class="bat-health-fill" [style.width.%]="systemStats?.battery?.health"></div>
+              </div>
+            </div>
+            <div class="bat-detail-item" *ngIf="systemStats?.battery?.cycle_count !== null">
+              <span class="bat-detail-label">Cycle Count</span>
+              <span class="bat-detail-val">{{ systemStats?.battery?.cycle_count }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- System Health & Uptime Card -->
+        <div class="stat-card health-uptime-card fade-in" *ngIf="widgetVisibility.info && systemStats">
+          <div class="card-header">
+            <span class="icon" [style.color]="'#6CCB5F'"><i class="ri-heart-pulse-line"></i></span>
+            <h3>System Health & Uptime</h3>
+            <span class="health-badge" [class.good]="systemStats.health_score > 80"
+              [class.warning]="systemStats.health_score <= 80 && systemStats.health_score > 60"
+              [class.critical]="systemStats.health_score <= 60">
+              {{ systemStats.health_score }}%
+            </span>
+          </div>
+
+          <div class="health-overview">
+            <div class="health-item">
+              <span class="h-label">SYSTEM UPTIME</span>
+              <span class="h-value-big">{{ formatUptime(systemStats.uptime) }}</span>
+            </div>
+
+            <div class="health-stats-grid">
+              <div class="h-stat">
+                <span class="h-stat-label">LAST BOOT</span>
+                <span class="h-stat-val">{{ formatTimestamp(systemStats.last_boot_time) }}</span>
+              </div>
+              <div class="h-stat">
+                <span class="h-stat-label">CRASH REPORTS</span>
+                <span class="h-stat-val" [class.alert]="systemStats.crash_reports_count > 0">
+                  {{ systemStats.crash_reports_count }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="health-bar-container">
+            <div class="health-fill" [style.width.%]="systemStats.health_score"
+              [style.background]="getHealthColor(systemStats.health_score)"></div>
+          </div>
+          <div class="health-status-text">
+            {{ getHealthStatusMessage(systemStats.health_score) }}
+          </div>
+        </div>
+
         <!-- Hardware Details Card -->
-        <div class="stat-card system-card fade-in" *ngIf="widgetVisibility.info">
+        <div class="stat-card system-card fade-in" *ngIf="widgetVisibility.info && systemStats">
           <div class="card-header">
             <span class="icon"><i class="ri-information-line"></i></span>
-            <h3>System Info</h3>
+            <h3>Environment</h3>
           </div>
           <div class="system-details">
             <div class="detail-item">
@@ -655,6 +769,108 @@
         <div class="live-indicator" *ngIf="!isMiniMode">
           <span class="dot pulse"></span>
           Monitoring Live Metrics
+        </div>
+      </div>
+    </section>
+
+    <!-- Performance History View -->
+    <section class="performance-view" [class.hidden]="activeTab !== 'performance'">
+      <div class="performance-header">
+        <div class="perf-title-row">
+          <h2><i class="ri-pulse-line"></i> Performance Analytics</h2>
+          <p>Real-time telemetry and resource trends</p>
+        </div>
+        <div class="perf-stats-minimal" *ngIf="systemStats">
+          <div class="p-min-stat">
+            <span class="p-label">CPU</span>
+            <span class="p-val">{{ systemStats.cpu_usage.toFixed(1) }}%</span>
+          </div>
+          <div class="p-min-stat">
+            <span class="p-label">MEM</span>
+            <span class="p-val">{{ getMemoryPercentage().toFixed(1) }}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="performance-grid">
+        <!-- CPU History -->
+        <div class="stat-card timeline-card fade-in">
+          <div class="card-header">
+            <span class="icon" [style.color]="'#60CDFF'"><i class="ri-cpu-line"></i></span>
+            <h3>CPU Utilization History</h3>
+            <span class="perf-badge-val">{{ systemStats?.cpu_usage?.toFixed(1) }}%</span>
+          </div>
+          <div class="chart-container">
+            <canvas #cpuCanvas></canvas>
+          </div>
+        </div>
+
+        <!-- RAM History -->
+        <div class="stat-card timeline-card fade-in">
+          <div class="card-header">
+            <span class="icon" [style.color]="'#6CCB5F'"><i class="ri-ram-2-line"></i></span>
+            <h3>Memory Load History</h3>
+            <span class="perf-badge-val">{{ getMemoryPercentage().toFixed(1) }}%</span>
+          </div>
+          <div class="chart-container">
+            <canvas #memoryCanvas></canvas>
+          </div>
+        </div>
+
+        <!-- Network Activity History -->
+        <div class="stat-card timeline-card fade-in">
+          <div class="card-header">
+            <span class="icon" [style.color]="'#FFD700'"><i class="ri-global-line"></i></span>
+            <h3>Network Activity (Down/Up)</h3>
+            <div class="net-speed-mini">
+              <span class="down"><i class="ri-arrow-down-line"></i> {{ formatBytes(netSpeedIn) }}/s</span>
+              <span class="up"><i class="ri-arrow-up-line"></i> {{ formatBytes(netSpeedOut) }}/s</span>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas #netTrafficCanvas></canvas>
+          </div>
+        </div>
+
+        <!-- Disk I/O History -->
+        <div class="stat-card timeline-card fade-in">
+          <div class="card-header">
+            <span class="icon" [style.color]="'#FCE100'"><i class="ri-hard-drive-3-line"></i></span>
+            <h3>Disk I/O Analytics</h3>
+            <div class="disk-speed-mini">
+              <span class="read"><i class="ri-arrow-left-right-line"></i> R: {{ formatBytes(systemStats?.disk_read_speed
+                ?? 0) }}/s</span>
+              <span class="write">W: {{ formatBytes(systemStats?.disk_write_speed ?? 0) }}/s</span>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas #diskIOHistoryCanvas></canvas>
+          </div>
+        </div>
+
+        <!-- GPU History -->
+        <div class="stat-card timeline-card fade-in">
+          <div class="card-header">
+            <span class="icon" [style.color]="'#FF6B6B'"><i class="ri-gamepad-line"></i></span>
+            <h3>GPU Performance History</h3>
+            <span class="perf-badge-val">{{ systemStats?.gpu_usage?.toFixed(1) }}%</span>
+          </div>
+          <div class="chart-container">
+            <canvas #gpuCanvas></canvas>
+          </div>
+        </div>
+
+        <!-- Connection Latency History -->
+        <div class="stat-card timeline-card fade-in">
+          <div class="card-header">
+            <span class="icon" [style.color]="'#39ff14'"><i class="ri-broadcast-line"></i></span>
+            <h3>Ping & Latency history</h3>
+            <span class="perf-badge-val" [class.critical]="(systemStats?.ping ?? 0) > 150">{{ systemStats?.ping }}
+              ms</span>
+          </div>
+          <div class="chart-container">
+            <canvas #pingCanvas></canvas>
+          </div>
         </div>
       </div>
     </section>

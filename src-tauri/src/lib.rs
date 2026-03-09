@@ -22,6 +22,17 @@ struct ComponentInfo {
 }
 
 #[derive(Serialize)]
+struct BatteryStats {
+    percentage: f32,
+    is_charging: bool,
+    status: String,
+    time_remaining: Option<u64>, // seconds
+    health: Option<f32>,         // 0-100
+    power_usage: Option<f32>,    // Watts
+    cycle_count: Option<u32>,
+}
+
+#[derive(Serialize)]
 struct ProcessInfo {
     name: String,
     pid: u32,
@@ -138,7 +149,7 @@ struct SystemStats {
     gpu_fan_speed: Option<u32>,
     vram_used: u64,
     vram_total: u64,
-    battery_level: Option<f32>,
+    battery: Option<BatteryStats>,
     disk_read_speed: u64,
     disk_write_speed: u64,
     ping: u32,
@@ -151,6 +162,9 @@ struct SystemStats {
     sensors: Vec<ComponentInfo>,
     local_ip: String,
     active_connections: usize,
+    last_boot_time: u64,
+    health_score: u8,
+    crash_reports_count: u32,
 }
 
 pub struct AppState {
@@ -308,6 +322,47 @@ fn get_system_stats(state: State<'_, Arc<AppState>>) -> SystemStats {
         })
         .collect();
 
+    // 7. Battery Stats
+    let mut battery_info = None;
+    if let Ok(manager) = starship_battery::Manager::new() {
+        if let Ok(mut batteries) = manager.batteries() {
+            if let Some(Ok(battery)) = batteries.next() {
+                let percentage = battery.state_of_charge().value * 100.0;
+                let status = format!("{:?}", battery.state());
+                let is_charging = match battery.state() {
+                    starship_battery::State::Charging | starship_battery::State::Full => true,
+                    _ => false,
+                };
+
+                let time_remaining = battery
+                    .time_to_full()
+                    .map(|v| v.value as u64)
+                    .or_else(|| battery.time_to_empty().map(|v| v.value as u64));
+
+                let energy_full = battery.energy_full().value;
+                let energy_full_design = battery.energy_full_design().value;
+                let health = if energy_full_design > 0.0 {
+                    Some((energy_full / energy_full_design) * 100.0)
+                } else {
+                    None
+                };
+
+                // Power in Watts = Voltage * Current (starship-battery usually provides energy_rate directly)
+                let power_usage = Some(battery.energy_rate().value);
+
+                battery_info = Some(BatteryStats {
+                    percentage,
+                    is_charging,
+                    status,
+                    time_remaining,
+                    health,
+                    power_usage,
+                    cycle_count: battery.cycle_count(),
+                });
+            }
+        }
+    }
+
     let mut last_time = state.last_sample_time.lock().unwrap();
     let mut last_read = state.last_disk_total_read.lock().unwrap();
     let mut last_write = state.last_disk_total_write.lock().unwrap();
@@ -353,7 +408,6 @@ fn get_system_stats(state: State<'_, Arc<AppState>>) -> SystemStats {
         gpu_fan_speed,
         vram_used: 0,
         vram_total: 0,
-        battery_level: None,
         disk_read_speed,
         disk_write_speed,
         ping: *state.ping.lock().unwrap(),
@@ -372,7 +426,75 @@ fn get_system_stats(state: State<'_, Arc<AppState>>) -> SystemStats {
             .map(|ip| ip.to_string())
             .unwrap_or_else(|_| "Unknown".to_string()),
         active_connections: sys.processes().len(), // Fallback or estimate
+        last_boot_time: System::boot_time(),
+        health_score: calculate_health_score(
+            cpu_usage,
+            memory_used,
+            memory_total,
+            cpu_temp,
+            &battery_info,
+        ),
+        battery: battery_info,
+        crash_reports_count: get_crash_reports_count(),
     }
+}
+
+fn calculate_health_score(
+    cpu_usage: f32,
+    memory_used: u64,
+    memory_total: u64,
+    cpu_temp: Option<f32>,
+    battery: &Option<BatteryStats>,
+) -> u8 {
+    let mut score = 100i16;
+
+    if cpu_usage > 90.0 {
+        score -= 20;
+    } else if cpu_usage > 70.0 {
+        score -= 10;
+    }
+
+    if memory_total > 0 {
+        let mem_pct = (memory_used as f64 / memory_total as f64) * 100.0;
+        if mem_pct > 95.0 {
+            score -= 25;
+        } else if mem_pct > 80.0 {
+            score -= 15;
+        }
+    }
+
+    if let Some(t) = cpu_temp {
+        if t > 90.0 {
+            score -= 20;
+        } else if t > 75.0 {
+            score -= 10;
+        }
+    }
+
+    if let Some(bat) = battery {
+        if let Some(health) = bat.health {
+            if health < 70.0 {
+                score -= 15;
+            } else if health < 85.0 {
+                score -= 5;
+            }
+        }
+    }
+
+    score.max(0).min(100) as u8
+}
+
+fn get_crash_reports_count() -> u32 {
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(appdata) = std::env::var("LOCALAPPDATA") {
+            let path = format!("{}\\CrashDumps", appdata);
+            if let Ok(entries) = std::fs::read_dir(path) {
+                return entries.count() as u32;
+            }
+        }
+    }
+    0
 }
 
 fn get_latency() -> u32 {
