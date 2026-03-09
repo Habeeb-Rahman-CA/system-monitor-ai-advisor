@@ -1,5 +1,7 @@
 use serde::Serialize;
+use std::env;
 use std::fs;
+use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 use sysinfo::{Components, Disks, Networks, System};
 use tauri::{Manager, State};
@@ -1287,7 +1289,119 @@ async fn cleanup_gaming_memory() -> Result<String, String> {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+fn handle_cli_commands() -> bool {
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        return false;
+    }
+
+    let command = &args[1];
+
+    match command.as_str() {
+        "scan" => {
+            println!("\x1b[93m--- ZOH: AI SYSTEM SCAN (CLI MODE) ---\x1b[0m");
+            let mut sys = System::new_all();
+            sys.refresh_all();
+
+            println!("System Name:    {}", System::name().unwrap_or_default());
+            println!(
+                "System Version: {}",
+                System::os_version().unwrap_or_default()
+            );
+            println!(
+                "Kernel Version: {}",
+                System::kernel_version().unwrap_or_default()
+            );
+            println!(
+                "Host Name:      {}",
+                System::host_name().unwrap_or_default()
+            );
+            println!("Arch:           {}", System::cpu_arch());
+            println!("");
+            println!("CPU Model:      {}", sys.cpus()[0].brand());
+            println!("Global Usage:   {:.2}%", sys.global_cpu_usage());
+            println!("Total Memory:   {} MB", sys.total_memory() / 1024 / 1024);
+            println!("Used Memory:    {} MB", sys.used_memory() / 1024 / 1024);
+            println!(
+                "Swap:           {} / {} MB",
+                sys.used_swap() / 1024 / 1024,
+                sys.total_swap() / 1024 / 1024
+            );
+            println!("");
+            println!(
+                "Uptime:         {}h {}m",
+                System::uptime() / 3600,
+                (System::uptime() % 3600) / 60
+            );
+            println!("\x1b[93m--------------------------------------\x1b[0m");
+            true
+        }
+        "monitor" => {
+            if args.contains(&"--cpu".to_string()) {
+                println!("\x1b[93mZOH Active Monitor: CPU Usage (Ctrl+C to stop)\x1b[0m");
+                let mut sys = System::new_all();
+                loop {
+                    sys.refresh_cpu_usage();
+                    print!(
+                        "\rCPU Usage: \x1b[92m[{: <50}]\x1b[0m {:.1}%   ",
+                        "=".repeat((sys.global_cpu_usage() / 2.0) as usize),
+                        sys.global_cpu_usage()
+                    );
+                    io::stdout().flush().unwrap();
+                    std::thread::sleep(std::time::Duration::from_millis(1000));
+                }
+            } else {
+                println!("Usage: zoh monitor --cpu");
+                true
+            }
+        }
+        "clean-temp" => {
+            println!("\x1b[91mZOH Cleaner: Searching for temporary clutter...\x1b[0m");
+            let mut freed_space = 0;
+
+            #[cfg(target_os = "windows")]
+            {
+                if let Ok(temp_dir) = env::var("TEMP") {
+                    if let Ok(entries) = fs::read_dir(&temp_dir) {
+                        for entry in entries.flatten() {
+                            let path = entry.path();
+                            if let Ok(metadata) = fs::metadata(&path) {
+                                let size = metadata.len();
+                                if path.is_file() {
+                                    if fs::remove_file(&path).is_ok() {
+                                        freed_space += size;
+                                    }
+                                } else if fs::remove_dir_all(&path).is_ok() {
+                                    freed_space += size;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            println!(
+                "\x1b[92mSuccess! ZOH has freed up {} MB of temporary space.\x1b[0m",
+                freed_space / 1024 / 1024
+            );
+            true
+        }
+        "help" | "--help" | "-h" => {
+            println!("ZOH: AI SYSTEM MONITOR - CLI HELP");
+            println!("Commands:");
+            println!("  scan         Quick system health and hardware summary");
+            println!("  monitor      Real-time monitors (usage: monitor --cpu)");
+            println!("  clean-temp   Purge system temporary files");
+            true
+        }
+        _ => false,
+    }
+}
+
 pub fn run() {
+    if handle_cli_commands() {
+        return;
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
