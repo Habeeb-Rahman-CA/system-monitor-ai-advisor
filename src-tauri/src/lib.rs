@@ -1288,6 +1288,12 @@ async fn cleanup_gaming_memory() -> Result<String, String> {
     Ok("Not implemented for this OS".to_string())
 }
 
+#[tauri::command]
+fn report_error(error: String) {
+    eprintln!("[ZOH ERROR REPORT] {}", error);
+    // In a real app, this would send to Sentry or a log file
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 fn handle_cli_commands() -> bool {
     let args: Vec<String> = env::args().collect();
@@ -1404,6 +1410,7 @@ pub fn run() {
     }
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let app_state = Arc::new(AppState {
                 sys: Mutex::new(System::new_all()),
@@ -1462,7 +1469,8 @@ pub fn run() {
             save_api_request,
             delete_api_request,
             toggle_gaming_boost,
-            cleanup_gaming_memory
+            cleanup_gaming_memory,
+            report_error
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

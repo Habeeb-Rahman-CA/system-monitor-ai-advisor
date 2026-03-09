@@ -235,6 +235,43 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   interval: any;
   appStartTime = Date.now();
   isAppReady = false;
+  appVersion = "1.0.0";
+  isCheckingUpdate = false;
+
+  async checkUpdates(silent = false) {
+    try {
+      this.isCheckingUpdate = true;
+      this.cdr.markForCheck();
+
+      const { check } = await import('@tauri-apps/plugin-updater');
+      const update = await check();
+
+      if (update) {
+        const { ask } = await import('@tauri-apps/plugin-dialog');
+        const yes = await ask(`New version ${update.version} is available! Would you like to install it now?`, {
+          title: 'Update Available',
+          kind: 'info',
+          okLabel: 'Install & Relaunch',
+          cancelLabel: 'Later'
+        });
+
+        if (yes) {
+          await update.downloadAndInstall();
+        }
+      } else if (!silent) {
+        const { message } = await import('@tauri-apps/plugin-dialog');
+        await message('You are already on the latest version of ZOH.', {
+          title: 'No Updates',
+          kind: 'info'
+        });
+      }
+    } catch (e) {
+      console.error("Update check failed", e);
+    } finally {
+      this.isCheckingUpdate = false;
+      this.cdr.markForCheck();
+    }
+  }
 
   cpuChart: Chart | null = null;
   memoryChart: Chart | null = null;

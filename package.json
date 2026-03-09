@@ -1,6 +1,6 @@
 {
-  "name": "system-monitor",
-  "version": "0.1.0",
+  "name": "zoh-ai-monitor",
+  "version": "1.0.0",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
@@ -19,7 +19,9 @@
     "@huggingface/hub": "^2.10.5",
     "@mlc-ai/web-llm": "^0.2.81",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-updater": "^2.10.0",
     "chart.js": "^4.5.1",
     "jspdf": "^4.2.0",
     "jspdf-autotable": "^5.0.7",

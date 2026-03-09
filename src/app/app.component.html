@@ -113,6 +113,13 @@
         </span>
       </button>
     </div>
+
+    <div class="sidebar-v-info" *ngIf="!isSidebarCollapsed">
+      <span class="v-tag">v{{ appVersion }}</span>
+      <button class="update-check-btn" (click)="checkUpdates()" [disabled]="isCheckingUpdate">
+        <i class="ri-refresh-line" [class.spin]="isCheckingUpdate"></i>
+      </button>
+    </div>
   </aside>
 
   <!-- AI Performance Advisor Panel -->

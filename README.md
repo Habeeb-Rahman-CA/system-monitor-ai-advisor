@@ -221,8 +221,8 @@ Uptime:         45h 1m
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/Habeeb-Rahman-CA/system-monitor.git
-cd system-monitor
+git clone https://github.com/Habeeb-Rahman-CA/zoh-ai-monitor.git
+cd zoh-ai-monitor
 ```
 
 ### 2. Install dependencies
@@ -258,7 +258,7 @@ The installer will be generated in `src-tauri/target/release/bundle/`.
 ## 📁 Project Structure
 
 ```
-system-monitor/
+zoh-ai-monitor/
 ├── src/                          # Angular frontend
 │   ├── app/
 │   │   ├── app.component.ts      # Main application logic

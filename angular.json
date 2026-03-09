@@ -6,7 +6,7 @@
     "analytics": false
   },
   "projects": {
-    "system-monitor": {
+    "zoh-ai-monitor": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -68,10 +68,10 @@
           },
           "configurations": {
             "production": {
-              "buildTarget": "system-monitor:build:production"
+              "buildTarget": "zoh-ai-monitor:build:production"
             },
             "development": {
-              "buildTarget": "system-monitor:build:development"
+              "buildTarget": "zoh-ai-monitor:build:development"
             }
           },
           "defaultConfiguration": "development"

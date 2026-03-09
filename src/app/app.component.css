@@ -4697,3 +4697,56 @@ h3 {
 .pulsate {
   animation: pulsate 2s infinite ease-in-out;
 }
+
+/* -- Sidebar Version Info ------------------------------------ */
+.sidebar-v-info {
+  margin-top: auto;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--fluent-divider);
+  opacity: 0.6;
+}
+
+.v-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.update-check-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s;
+}
+
+.update-check-btn:hover {
+  background: var(--fluent-layer-hover);
+  opacity: 1;
+}
+
+.update-check-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.spin {
+  animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
