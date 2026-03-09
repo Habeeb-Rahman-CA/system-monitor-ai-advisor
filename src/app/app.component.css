@@ -4525,3 +4525,81 @@ h3 {
   background: rgba(255, 94, 94, 0.1);
   transform: scale(1.1);
 }
+
+/* -- AI Health Summary (Performance View) -------------------- */
+.health-summary-card {
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(16, 124, 16, 0.05) 0%, rgba(0, 0, 0, 0) 100%);
+  border-left: 4px solid var(--accent-green);
+}
+
+.health-summary-content {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin: 1.5rem 0;
+}
+
+.health-score-big {
+  display: flex;
+  align-items: baseline;
+  color: var(--accent-green);
+}
+
+.score-number {
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.score-total {
+  font-size: 1.2rem;
+  opacity: 0.6;
+  margin-left: 2px;
+}
+
+.health-meta-text {
+  flex: 1;
+}
+
+.status-msg {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.health-advice-summary {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+
+.health-mini-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.mini-bar-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.m-bar {
+  width: 120px;
+  height: 4px;
+  background: var(--fluent-stroke);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.m-fill {
+  height: 100%;
+  background: var(--accent-green);
+  border-radius: 2px;
+  transition: width 0.6s ease;
+}

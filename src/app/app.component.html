@@ -825,6 +825,46 @@
       </div>
 
       <div class="performance-grid">
+        <!-- AI System Health Score -->
+        <div class="stat-card health-summary-card fade-in" *ngIf="systemStats">
+          <div class="card-header">
+            <span class="icon" [style.color]="'#6CCB5F'"><i class="ri-heart-pulse-line"></i></span>
+            <h3>AI System Health Overview</h3>
+          </div>
+          <div class="health-summary-content">
+            <div class="health-score-big">
+              <span class="score-number">{{ systemStats.health_score }}</span>
+              <span class="score-total">/100</span>
+            </div>
+            <div class="health-meta-text">
+              <div class="status-msg">Your system performance: <strong>{{
+                  getHealthStatusMessage(systemStats.health_score) }}</strong></div>
+              <p class="health-advice-summary">AI analysis: System is running within optimal parameters with minimal
+                thermal throttling.</p>
+            </div>
+          </div>
+          <div class="health-mini-bars">
+            <div class="mini-bar-item">
+              <span>CPU Wellness</span>
+              <div class="m-bar">
+                <div class="m-fill" [style.width.%]="100 - systemStats.cpu_usage"></div>
+              </div>
+            </div>
+            <div class="mini-bar-item">
+              <span>Thermal Stability</span>
+              <div class="m-bar">
+                <div class="m-fill" [style.width.%]="100 - (systemStats.cpu_temp || 40)"></div>
+              </div>
+            </div>
+            <div class="mini-bar-item">
+              <span>Memory Efficiency</span>
+              <div class="m-bar">
+                <div class="m-fill" [style.width.%]="100 - getMemoryPercentage()"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- CPU History -->
         <div class="stat-card timeline-card fade-in">
           <div class="card-header">

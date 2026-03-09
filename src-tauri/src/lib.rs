@@ -221,9 +221,9 @@ fn get_system_stats(state: State<'_, Arc<AppState>>) -> SystemStats {
         let mut last_hw = state.last_hardware_refresh.lock().unwrap();
         // Check if we need to refresh (either 10s passed or first run where list is empty)
         if now.duration_since(*last_hw).as_secs() >= 10 {
-            state.disks.lock().unwrap().refresh(false);
-            state.networks.lock().unwrap().refresh(false);
-            state.components.lock().unwrap().refresh(false);
+            state.disks.lock().unwrap().refresh(true);
+            state.networks.lock().unwrap().refresh(true);
+            state.components.lock().unwrap().refresh(true);
             *last_hw = now;
         }
     }
@@ -1292,10 +1292,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let app_state = Arc::new(AppState {
-                sys: Mutex::new(System::new()),
-                disks: Mutex::new(Disks::new()),
-                networks: Mutex::new(Networks::new()),
-                components: Mutex::new(Components::new()),
+                sys: Mutex::new(System::new_all()),
+                disks: Mutex::new(Disks::new_with_refreshed_list()),
+                networks: Mutex::new(Networks::new_with_refreshed_list()),
+                components: Mutex::new(Components::new_with_refreshed_list()),
                 last_hardware_refresh: Mutex::new(
                     std::time::Instant::now() - std::time::Duration::from_secs(3600),
                 ),
