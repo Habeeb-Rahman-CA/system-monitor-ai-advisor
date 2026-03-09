@@ -2,10 +2,24 @@ use serde::Serialize;
 use std::env;
 use std::fs;
 use std::io::{self, Write};
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 use sysinfo::{Components, Disks, Networks, System};
 use tauri::{Manager, State};
 use tauri_plugin_opener::OpenerExt;
+
+#[cfg(target_os = "windows")]
+fn create_silent_command(cmd: &str) -> Command {
+    use std::os::windows::process::CommandExt;
+    let mut command = Command::new(cmd);
+    command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    command
+}
+
+#[cfg(not(target_os = "windows"))]
+fn create_silent_command(cmd: &str) -> Command {
+    Command::new(cmd)
+}
 
 #[derive(Serialize)]
 struct DiskInfo {
@@ -514,8 +528,7 @@ fn get_latency() -> u32 {
 fn get_wifi_signal() -> u32 {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
-        if let Ok(out) = Command::new("netsh")
+        if let Ok(out) = create_silent_command("netsh")
             .args(&["wlan", "show", "interfaces"])
             .output()
         {
@@ -554,8 +567,7 @@ fn kill_process(state: State<'_, Arc<AppState>>, pid: u32) -> Result<(), String>
 fn get_services() -> Vec<ServiceInfo> {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
-        let output = Command::new("powershell")
+        let output = create_silent_command("powershell")
             .args(&[
                 "-Command",
                 "Get-Service | Select-Object Name, DisplayName, Status | ConvertTo-Json",
@@ -588,13 +600,12 @@ fn get_services() -> Vec<ServiceInfo> {
 fn control_service(name: String, action: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
         let cmd = if action == "start" {
             "Start-Service"
         } else {
             "Stop-Service"
         };
-        let output = Command::new("powershell")
+        let output = create_silent_command("powershell")
             .args(&[
                 "-Command",
                 &format!(
@@ -678,11 +689,9 @@ async fn save_export(
 
 #[tauri::command]
 async fn get_active_ports(state: State<'_, Arc<AppState>>) -> Result<Vec<PortInfo>, String> {
-    use std::process::Command;
-
     // On Windows, use netstat -ano to find listening ports
     let output = if cfg!(target_os = "windows") {
-        Command::new("netstat")
+        create_silent_command("netstat")
             .args(["-ano"]) // Get all, include UDP
             .output()
             .map_err(|e| e.to_string())?
@@ -750,10 +759,8 @@ async fn get_active_ports(state: State<'_, Arc<AppState>>) -> Result<Vec<PortInf
 
 #[tauri::command]
 async fn get_dev_servers(state: State<'_, Arc<AppState>>) -> Result<Vec<DevServerInfo>, String> {
-    use std::process::Command;
-
     let output = if cfg!(target_os = "windows") {
-        Command::new("netstat")
+        create_silent_command("netstat")
             .args(["-ano"])
             .output()
             .map_err(|e| e.to_string())?
@@ -864,8 +871,7 @@ fn open_project_folder(app: tauri::AppHandle, pid: u32) -> Result<(), String> {
 
 #[tauri::command]
 async fn get_docker_containers() -> Result<Vec<DockerContainer>, String> {
-    use std::process::Command;
-    let output = Command::new("docker")
+    let output = create_silent_command("docker")
         .args([
             "ps",
             "-a",
@@ -896,13 +902,12 @@ async fn get_docker_containers() -> Result<Vec<DockerContainer>, String> {
 
 #[tauri::command]
 async fn control_docker_container(id: String, action: String) -> Result<(), String> {
-    use std::process::Command;
     let valid_actions = ["start", "stop", "restart"];
     if !valid_actions.contains(&action.as_str()) {
         return Err("Invalid action".to_string());
     }
 
-    Command::new("docker")
+    create_silent_command("docker")
         .args([&action, &id])
         .output()
         .map_err(|e| e.to_string())?;
@@ -926,8 +931,7 @@ async fn get_db_servers(state: State<'_, Arc<AppState>>) -> Result<Vec<DbServerI
     sys.refresh_all();
 
     // Re-use active ports logic internally
-    use std::process::Command;
-    let output = Command::new("netstat")
+    let output = create_silent_command("netstat")
         .args(["-ano"])
         .output()
         .map_err(|e| e.to_string())?;
@@ -1006,24 +1010,22 @@ async fn get_pkg_managers(state: State<'_, Arc<AppState>>) -> Result<Vec<PkgMana
 
 #[tauri::command]
 async fn get_git_activity() -> Result<GitStatus, String> {
-    use std::process::Command;
-
     // Attempt to get Git info for the current working directory
-    let output = Command::new("git")
+    let output = create_silent_command("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .output()
         .map_err(|_| "Git not found or not a repository".to_string())?;
 
     let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
-    let status_output = Command::new("git")
+    let status_output = create_silent_command("git")
         .args(["status", "--short"])
         .output()
         .map_err(|e| e.to_string())?;
     let status_str = String::from_utf8_lossy(&status_output.stdout);
     let changed_count = status_str.lines().count();
 
-    let log_output = Command::new("git")
+    let log_output = create_silent_command("git")
         .args(["log", "-1", "--pretty=%B"])
         .output()
         .map_err(|e| e.to_string())?;
@@ -1031,7 +1033,7 @@ async fn get_git_activity() -> Result<GitStatus, String> {
         .trim()
         .to_string();
 
-    let repo_name = Command::new("git")
+    let repo_name = create_silent_command("git")
         .args(["rev-parse", "--show-toplevel"])
         .output()
         .map_err(|e| e.to_string())?;
@@ -1055,8 +1057,6 @@ async fn get_git_activity() -> Result<GitStatus, String> {
 
 #[tauri::command]
 async fn get_environment_info() -> Result<EnvironmentInfo, String> {
-    use std::process::Command;
-
     let mut info = EnvironmentInfo {
         node_version: "Not found".to_string(),
         python_version: "Not found".to_string(),
@@ -1072,19 +1072,19 @@ async fn get_environment_info() -> Result<EnvironmentInfo, String> {
     };
 
     // Node Version
-    if let Ok(out) = Command::new("node").arg("--version").output() {
+    if let Ok(out) = create_silent_command("node").arg("--version").output() {
         info.node_version = String::from_utf8_lossy(&out.stdout).trim().to_string();
     }
 
     // Python Version
-    if let Ok(out) = Command::new("python").arg("--version").output() {
+    if let Ok(out) = create_silent_command("python").arg("--version").output() {
         info.python_version = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    } else if let Ok(out) = Command::new("python3").arg("--version").output() {
+    } else if let Ok(out) = create_silent_command("python3").arg("--version").output() {
         info.python_version = String::from_utf8_lossy(&out.stdout).trim().to_string();
     }
 
     // Rust Version
-    if let Ok(out) = Command::new("rustc").arg("--version").output() {
+    if let Ok(out) = create_silent_command("rustc").arg("--version").output() {
         info.rust_version = String::from_utf8_lossy(&out.stdout)
             .split_whitespace()
             .nth(1)
@@ -1093,7 +1093,7 @@ async fn get_environment_info() -> Result<EnvironmentInfo, String> {
     }
 
     // Git Version
-    if let Ok(out) = Command::new("git").arg("--version").output() {
+    if let Ok(out) = create_silent_command("git").arg("--version").output() {
         info.git_version = String::from_utf8_lossy(&out.stdout)
             .replace("git version", "")
             .trim()
@@ -1237,7 +1237,6 @@ fn delete_api_request(app: tauri::AppHandle, id: String) -> Result<(), String> {
 async fn toggle_gaming_boost(active: bool) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
         // 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c is High Performance
         // a1841308-3541-4fab-bc81-f71556f20b4a is Power Saver
         // 381b4222-f694-41f0-9685-ff5bb260df2e is Balanced
@@ -1248,7 +1247,7 @@ async fn toggle_gaming_boost(active: bool) -> Result<String, String> {
             "381b4222-f694-41f0-9685-ff5bb260df2e"
         };
 
-        Command::new("powercfg")
+        create_silent_command("powercfg")
             .args(["-setactive", plan_guid])
             .output()
             .map_err(|e| e.to_string())?;
@@ -1268,7 +1267,6 @@ async fn toggle_gaming_boost(active: bool) -> Result<String, String> {
 async fn cleanup_gaming_memory() -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
         // Use PowerShell to clear working sets of non-essential processes or common bloat
         // This is a simplified "Booster" approach
         let script = r#"
@@ -1277,7 +1275,7 @@ async fn cleanup_gaming_memory() -> Result<String, String> {
             }
         "#;
 
-        Command::new("powershell")
+        create_silent_command("powershell")
             .args(["-Command", script])
             .output()
             .map_err(|e| e.to_string())?;
