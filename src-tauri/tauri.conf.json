@@ -43,7 +43,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk1QjU2Q0JDMEQxMzhGMzUKUldRMWp4TU52R3kxbFF4UVJGa1g1ZGpLbWMrQjROeEdtaXpQSzlFbXVWZGduRDJrYW90bW1hejkK",
       "endpoints": [
-        "https://github.com/Habeeb-Rahman-CA/zoh-ai-monitor/releases/latest/download/update.json"
+        "https://raw.githubusercontent.com/Habeeb-Rahman-CA/zoh-ai-monitor/main/update.json"
       ]
     }
   }

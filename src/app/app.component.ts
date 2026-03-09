@@ -267,6 +267,18 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     } catch (e) {
       console.error("Update check failed", e);
+      if (!silent) {
+        try {
+          const { message } = await import('@tauri-apps/plugin-dialog');
+          await message('Failed to check for updates. Please check your internet connection and try again later.\n\nError: ' + e, {
+            title: 'Update Error',
+            kind: 'error'
+          });
+        } catch (innerErr) {
+          // Fallback if dialog plugin fails
+          alert("Update check failed: " + e);
+        }
+      }
     } finally {
       this.isCheckingUpdate = false;
       this.cdr.markForCheck();
