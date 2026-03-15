@@ -1742,9 +1742,6 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  toggleWidget(widget: keyof typeof this.widgetVisibility) {
-    this.widgetVisibility[widget] = !this.widgetVisibility[widget];
-  }
 
   private buildProcessTree(list: ProcessInfo[]): ProcessInfo[] {
     const tree: ProcessInfo[] = [];

@@ -197,6 +197,10 @@ pub struct AppState {
     last_disk_total_read: Mutex<u64>,
     last_disk_total_write: Mutex<u64>,
     last_sample_time: Mutex<std::time::Instant>,
+    gpu_name: Mutex<String>,
+    vram_total: Mutex<u64>,
+    gpu_usage: Mutex<f32>,
+    vram_used: Mutex<u64>,
 }
 
 #[derive(serde::Deserialize, Serialize, Clone)]
@@ -303,7 +307,7 @@ fn get_system_stats(state: State<'_, Arc<AppState>>) -> SystemStats {
             cpu_temp = temp;
         }
 
-        let is_gpu = label.contains("gpu") || label.contains("nvidia") || label.contains("amd");
+        let is_gpu = label.contains("gpu") || label.contains("nvidia") || label.contains("amd") || label.contains("graphics");
         if is_gpu {
             if gpu_name == "N/A" {
                 gpu_name = c.label().to_string();
@@ -417,13 +421,17 @@ fn get_system_stats(state: State<'_, Arc<AppState>>) -> SystemStats {
         net_received,
         net_transmitted,
         processes,
-        gpu_name,
-        gpu_usage: 0.0, // This is often updated by a background process or simulated
+        gpu_name: if gpu_name == "N/A" {
+            state.gpu_name.lock().unwrap().clone()
+        } else {
+            gpu_name
+        },
+        gpu_usage: *state.gpu_usage.lock().unwrap(),
         gpu_temp,
         gpu_clock: None, // Hard to get cross-platform without specialized crates
         gpu_fan_speed,
-        vram_used: 0,
-        vram_total: 0,
+        vram_used: *state.vram_used.lock().unwrap(),
+        vram_total: *state.vram_total.lock().unwrap(),
         disk_read_speed,
         disk_write_speed,
         ping: *state.ping.lock().unwrap(),
@@ -1402,7 +1410,99 @@ fn handle_cli_commands() -> bool {
     }
 }
 
+fn get_gpu_name_fallback() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        let output = create_silent_command("wmic")
+            .args(&["path", "win32_VideoController", "get", "name"])
+            .output();
+        if let Ok(out) = output {
+            let s = String::from_utf8_lossy(&out.stdout);
+            let lines: Vec<&str> = s.lines().collect();
+            for line in lines {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() && trimmed != "Name" {
+                    return trimmed.to_string();
+                }
+            }
+        }
+    }
+    "N/A".to_string()
+}
+
+fn get_vram_total_fallback() -> u64 {
+    #[cfg(target_os = "windows")]
+    {
+        let output = create_silent_command("wmic")
+            .args(&["path", "win32_VideoController", "get", "AdapterRAM"])
+            .output();
+        if let Ok(out) = output {
+            let s = String::from_utf8_lossy(&out.stdout);
+            let lines: Vec<&str> = s.lines().collect();
+            for line in lines {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() && trimmed != "AdapterRAM" {
+                    if let Ok(bytes) = trimmed.parse::<u64>() {
+                        return bytes;
+                    }
+                }
+            }
+        }
+    }
+    0
+}
+
+fn get_gpu_usage_fallback() -> (f32, u64) {
+    #[cfg(target_os = "windows")]
+    {
+        // Try nvidia-smi first (much faster if available)
+        if let Ok(out) = create_silent_command("nvidia-smi")
+            .args(&["--query-gpu=utilization.gpu,memory.used", "--format=csv,noheader,nounits"])
+            .output()
+        {
+            let s = String::from_utf8_lossy(&out.stdout);
+            let parts: Vec<&str> = s.split(',').collect();
+            if parts.len() >= 2 {
+                let usage = parts[0].trim().parse::<f32>().unwrap_or(0.0);
+                let vram_mb = parts[1].trim().parse::<u64>().unwrap_or(0);
+                return (usage, vram_mb * 1024 * 1024);
+            }
+        }
+
+        // Fallback to PowerShell (Slow, runs in background thread every 5s)
+        let script = "(Get-Counter '\\GPU Engine(*)\\Utilization Percentage' -ErrorAction SilentlyContinue).CounterSamples | Measure-Object -Property CookedValue -Average | Select-Object -ExpandProperty Average";
+        let output = create_silent_command("powershell")
+            .args(&["-Command", script])
+            .output();
+
+        let mut usage = 0.0;
+        if let Ok(out) = output {
+            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if let Ok(val) = s.parse::<f32>() {
+                usage = val;
+            }
+        }
+
+        let vram_script = "(Get-Counter '\\GPU Process Memory(*)\\Dedicated Usage' -ErrorAction SilentlyContinue).CounterSamples | Measure-Object -Property CookedValue -Sum | Select-Object -ExpandProperty Sum";
+        let vram_output = create_silent_command("powershell")
+            .args(&["-Command", vram_script])
+            .output();
+
+        let mut vram = 0;
+        if let Ok(out) = vram_output {
+            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if let Ok(val) = s.parse::<f64>() {
+                vram = val as u64;
+            }
+        }
+
+        return (usage, vram);
+    }
+    (0.0, 0)
+}
+
 pub fn run() {
+
     if handle_cli_commands() {
         return;
     }
@@ -1415,14 +1515,16 @@ pub fn run() {
                 disks: Mutex::new(Disks::new_with_refreshed_list()),
                 networks: Mutex::new(Networks::new_with_refreshed_list()),
                 components: Mutex::new(Components::new_with_refreshed_list()),
-                last_hardware_refresh: Mutex::new(
-                    std::time::Instant::now() - std::time::Duration::from_secs(3600),
-                ),
+                last_hardware_refresh: Mutex::new(std::time::Instant::now()),
                 wifi_signal: Mutex::new(100),
                 ping: Mutex::new(0),
                 last_disk_total_read: Mutex::new(0),
                 last_disk_total_write: Mutex::new(0),
                 last_sample_time: Mutex::new(std::time::Instant::now()),
+                gpu_name: Mutex::new(get_gpu_name_fallback()),
+                vram_total: Mutex::new(get_vram_total_fallback()),
+                gpu_usage: Mutex::new(0.0),
+                vram_used: Mutex::new(0),
             });
 
             app.manage(app_state.clone());
@@ -1432,12 +1534,19 @@ pub fn run() {
             std::thread::spawn(move || loop {
                 let wifi = get_wifi_signal();
                 let latency = get_latency();
+                let (gpu, vram) = get_gpu_usage_fallback();
                 {
                     if let Ok(mut ws) = thread_state.wifi_signal.lock() {
                         *ws = wifi;
                     }
                     if let Ok(mut ps) = thread_state.ping.lock() {
                         *ps = latency;
+                    }
+                    if let Ok(mut gs) = thread_state.gpu_usage.lock() {
+                        *gs = gpu;
+                    }
+                    if let Ok(mut vu) = thread_state.vram_used.lock() {
+                        *vu = vram;
                     }
                 }
                 std::thread::sleep(std::time::Duration::from_secs(5));

@@ -481,7 +481,7 @@
         <div class="stat-card gpu-deep-card fade-in" *ngIf="widgetVisibility.gpu">
           <div class="card-header">
             <span class="icon" [style.color]="'#FF6B6B'"><i class="ri-gamepad-line"></i></span>
-            <h3>Discrete Graphics</h3>
+            <h3>{{ systemStats.gpu_name.toLowerCase().includes('nvidia') || systemStats.gpu_name.toLowerCase().includes('amd') ? 'Discrete Graphics' : 'Graphics Engine' }}</h3>
             <span class="gpu-type-badge">{{ systemStats.gpu_name.includes('NVIDIA') ? 'NVIDIA' :
               (systemStats.gpu_name.includes('AMD') ? 'AMD' : 'Integrated') }}</span>
           </div>
@@ -722,7 +722,7 @@
               <span class="value">{{ systemStats.os_name }} {{ systemStats.os_version }}</span>
             </div>
             <div class="detail-item">
-              <span class="label">GPU</span>
+              <span class="label">Graphics</span>
               <span class="value">{{ systemStats.gpu_name }}</span>
             </div>
           </div>
@@ -992,17 +992,6 @@
       </div>
 
       <div class="management-container">
-        <!-- Widget Visibility Controls -->
-        <div class="mgmt-card widget-controls-card fade-in">
-          <h3><i class="ri-palette-line"></i> Custom Dashboard</h3>
-          <p>Choose which metrics to monitor</p>
-          <div class="widget-toggles">
-            <label *ngFor="let widgetEntry of widgetVisibility | keyvalue; trackBy: trackByKey">
-              <input type="checkbox" [checked]="widgetEntry.value" (change)="toggleWidget($any(widgetEntry.key))">
-              {{ $any(widgetEntry.key).toUpperCase() }}
-            </label>
-          </div>
-        </div>
 
         <!-- Services List -->
         <div class="mgmt-card fade-in" *ngIf="mgmtSubTab === 'services'">
