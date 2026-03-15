@@ -114,23 +114,6 @@ interface DbServerInfo {
   uptime: number;
 }
 
-interface PkgManagerInfo {
-  name: string;
-  command: string;
-  cpu_usage: number;
-  memory: number;
-  pid: number;
-  duration: number;
-}
-
-interface GitStatus {
-  branch: string;
-  uncommitted_changes: number;
-  last_commit: string;
-  is_dirty: boolean;
-  repo_name: string;
-}
-
 interface EnvironmentInfo {
   node_version: string;
   python_version: string;
@@ -324,7 +307,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   lastMgmtRefresh = 0;
   isLoadingMgmt = false;
   mgmtSubTab: 'services' | 'startup' = 'services';
-  devSubTab: 'ports' | 'servers' | 'coding' | 'docker' | 'db' | 'pkg' | 'git' | 'env' = 'ports';
+  devSubTab: 'ports' | 'servers' | 'coding' | 'docker' | 'db' | 'env' = 'ports';
   services: ServiceInfo[] = [];
   startupApps: StartupInfo[] = [];
   activePorts: PortInfo[] = [];
@@ -337,9 +320,6 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   p_filteredDockerContainers: DockerContainer[] = [];
   dbServers: DbServerInfo[] = [];
   p_filteredDbServers: DbServerInfo[] = [];
-  pkgManagers: PkgManagerInfo[] = [];
-  p_filteredPkgManagers: PkgManagerInfo[] = [];
-  gitStatus: GitStatus | null = null;
   environmentInfo: EnvironmentInfo | null = null;
   envSearchTerm: string = '';
   filteredEnvVars: { key: string, value: string }[] = [];
@@ -349,8 +329,6 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   isLoadingCoding = false;
   isLoadingDocker = false;
   isLoadingDb = false;
-  isLoadingPkg = false;
-  isLoadingGit = false;
   isLoadingEnv = false;
   lastPortsRefresh = 0;
   managementSearchTerm = '';
@@ -1226,7 +1204,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   async refreshDevData() {
     if (this.isLoadingPorts || this.isLoadingServers || this.isLoadingCoding || this.isLoadingDocker ||
-      this.isLoadingDb || this.isLoadingPkg || this.isLoadingGit || this.isLoadingEnv) return;
+      this.isLoadingDb || this.isLoadingEnv) return;
     try {
       if (this.devSubTab === 'ports') {
         this.isLoadingPorts = true;
@@ -1253,13 +1231,6 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
         this.isLoadingDb = true;
         this.dbServers = await invoke<DbServerInfo[]>('get_db_servers');
         this.updateFilteredDbServers();
-      } else if (this.devSubTab === 'pkg') {
-        this.isLoadingPkg = true;
-        this.pkgManagers = await invoke<PkgManagerInfo[]>('get_pkg_managers');
-        this.updateFilteredPkgManagers();
-      } else if (this.devSubTab === 'git') {
-        this.isLoadingGit = true;
-        this.gitStatus = await invoke<GitStatus>('get_git_activity');
       } else if (this.devSubTab === 'env') {
         this.isLoadingEnv = true;
         this.environmentInfo = await invoke<EnvironmentInfo>('get_environment_info');
@@ -1275,8 +1246,6 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       this.isLoadingCoding = false;
       this.isLoadingDocker = false;
       this.isLoadingDb = false;
-      this.isLoadingPkg = false;
-      this.isLoadingGit = false;
       this.isLoadingEnv = false;
       this.cdr.markForCheck();
     }
@@ -1324,16 +1293,6 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       });
     }
 
-    // 3. Git status check
-    if (this.gitStatus && this.gitStatus.uncommitted_changes > 15) {
-      advices.push({
-        id: 'git_too_many_changes',
-        severity: 'info',
-        title: 'Large workspace diff',
-        message: `${this.gitStatus.uncommitted_changes} files modified. Consider committing your progress.`,
-        icon: 'ri-git-branch-line'
-      });
-    }
 
     // 4. Docker check
     const stoppedContainers = this.dockerContainers.filter(c => c.state === 'exited').length;
@@ -1362,16 +1321,6 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  updateFilteredPkgManagers() {
-    if (!this.managementSearchTerm) {
-      this.p_filteredPkgManagers = [...this.pkgManagers];
-    } else {
-      const term = this.managementSearchTerm.toLowerCase();
-      this.p_filteredPkgManagers = this.pkgManagers.filter(p =>
-        p.name.toLowerCase().includes(term) || p.command.toLowerCase().includes(term)
-      );
-    }
-  }
 
   updateFilteredCodingProcesses() {
     if (!this.managementSearchTerm) {
@@ -1545,10 +1494,9 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     this.updateFilteredCodingProcesses();
     this.updateFilteredDockerContainers();
     this.updateFilteredDbServers();
-    this.updateFilteredPkgManagers();
   }
 
-  setDevSubTab(tab: 'ports' | 'servers' | 'coding' | 'docker' | 'db' | 'pkg' | 'git' | 'env') {
+  setDevSubTab(tab: 'ports' | 'servers' | 'coding' | 'docker' | 'db' | 'env') {
     this.devSubTab = tab;
     this.refreshDevData();
   }

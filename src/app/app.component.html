@@ -1082,8 +1082,6 @@
         <button [class.active]="devSubTab === 'coding'" (click)="setDevSubTab('coding')">Coding Procs</button>
         <button [class.active]="devSubTab === 'docker'" (click)="setDevSubTab('docker')">Docker</button>
         <button [class.active]="devSubTab === 'db'" (click)="setDevSubTab('db')">Databases</button>
-        <button [class.active]="devSubTab === 'pkg'" (click)="setDevSubTab('pkg')">Pkg Managers</button>
-        <button [class.active]="devSubTab === 'git'" (click)="setDevSubTab('git')">Git</button>
         <button [class.active]="devSubTab === 'env'" (click)="setDevSubTab('env')">Env Info</button>
       </div>
 
@@ -1274,82 +1272,12 @@
           </table>
         </div>
 
-        <!-- Package Managers Table -->
-        <div *ngIf="devSubTab === 'pkg' && !isLoadingPkg">
-          <table class="mgmt-table">
-            <thead>
-              <tr>
-                <th>Process</th>
-                <th>Command</th>
-                <th>CPU%</th>
-                <th>RAM</th>
-                <th>Runtime</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let pkg of p_filteredPkgManagers; trackBy: trackByPid">
-                <td class="primary-text"><strong>{{ pkg.name }}</strong></td>
-                <td class="app-cmd"><code>{{ pkg.command }}</code></td>
-                <td>{{ pkg.cpu_usage.toFixed(1) }}%</td>
-                <td>{{ formatBytes(pkg.memory) }}</td>
-                <td>{{ formatDuration(pkg.duration) }}</td>
-              </tr>
-              <tr *ngIf="p_filteredPkgManagers.length === 0 && !isLoadingPkg">
-                <td colspan="5" class="empty-state" style="text-align: center; padding: 2rem;">No active package manager
-                  operations found</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Git Activity Panel -->
-        <div *ngIf="devSubTab === 'git' && !isLoadingGit">
-          <div class="git-panel" *ngIf="gitStatus">
-            <div class="git-header">
-              <div class="git-repo-name"><i class="ri-git-repository-line"></i> {{ gitStatus.repo_name }}</div>
-              <div class="git-status-badge" [class.dirty]="gitStatus.is_dirty">
-                {{ gitStatus.is_dirty ? 'Dirty' : 'Clean' }}
-              </div>
-            </div>
-            <div class="git-grid">
-              <div class="git-item">
-                <span class="label">Current Branch</span>
-                <span class="value"><i class="ri-git-branch-line"></i> {{ gitStatus.branch }}</span>
-              </div>
-              <div class="git-item">
-                <span class="label">Changes</span>
-                <span class="value">{{ gitStatus.uncommitted_changes }} files modified</span>
-              </div>
-            </div>
-            <div class="git-commit">
-              <span class="label">Last Commit Message</span>
-              <div class="commit-msg">"{{ gitStatus.last_commit }}"</div>
-            </div>
-          </div>
-          <div *ngIf="!gitStatus" class="empty-state" style="text-align: center; padding: 2rem;">
-            Failed to fetch Git status. Ensure this is a Git repository.
-          </div>
-        </div>
 
         <!-- Environment Info Grid -->
         <div *ngIf="devSubTab === 'env' && !isLoadingEnv" class="env-grid">
 
           <!-- Environment Variables Section -->
           <div class="env-vars-section" *ngIf="environmentInfo">
-            <div class="env-vars-header"
-              style="display: flex; justify-content: space-between; align-items: center; margin: 2rem 0 1rem; border-bottom: 1px solid var(--fluent-divider); padding-bottom: 0.5rem;">
-              <h3 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
-                <i class="ri-settings-5-line"></i> System Environment Variables
-                <span class="badge" style="font-size: 0.7rem; margin-left: 0.5rem;">{{ filteredEnvVars.length }}
-                  vars</span>
-              </h3>
-              <div class="search-box" style="width: 300px;">
-                <i class="ri-search-line"></i>
-                <input type="text" [(ngModel)]="envSearchTerm" (input)="updateFilteredEnvVars()"
-                  placeholder="Filter system variables...">
-              </div>
-            </div>
-
             <div class="mgmt-table-container" style="max-height: 400px; overflow-y: auto;">
               <table class="mgmt-table">
                 <thead>
@@ -1380,15 +1308,13 @@
 
 
         <div class="loading-overlay"
-          *ngIf="isLoadingPorts || isLoadingServers || isLoadingCoding || isLoadingDocker || isLoadingDb || isLoadingPkg || isLoadingGit || isLoadingEnv"
+          *ngIf="isLoadingPorts || isLoadingServers || isLoadingCoding || isLoadingDocker || isLoadingDb || isLoadingEnv"
           style="text-align: center; padding: 3rem;">
           <div class="spinner"></div>
           <p>{{ isLoadingPorts ? 'Scanning active ports...' :
             isLoadingServers ? 'Detecting development servers...' :
             isLoadingCoding ? 'Scanning coding processes...' :
             isLoadingDb ? 'Detecting database servers...' :
-            isLoadingPkg ? 'Monitoring package managers...' :
-            isLoadingGit ? 'Fetching git activity...' :
             isLoadingEnv ? 'Collecting environment info...' :
             'Fetching Docker containers...' }}</p>
         </div>
@@ -1492,20 +1418,6 @@
           </div>
           <div class="chart-container-gaming">
             <canvas #frameTimeCanvas></canvas>
-          </div>
-        </div>
-
-        <!-- Gaming Hardware Overlay Settings -->
-        <div class="gaming-card overlay-card fade-in">
-          <div class="card-header">
-            <span class="icon"><i class="ri-window-line"></i></span>
-            <h3>Compact Hardware Overlay</h3>
-          </div>
-          <p>Floating window with live CPU/GPU/FPS stats for in-game monitoring.</p>
-          <div class="overlay-toggle-wrap">
-            <button class="overlay-btn" [class.active]="isMiniMode" (click)="toggleOverlay()">
-              <i class="ri-external-link-line"></i> {{ isMiniMode ? 'CLOSE OVERLAY' : 'LAUNCH OVERLAY' }}
-            </button>
           </div>
         </div>
 
