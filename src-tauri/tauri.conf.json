@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ZOH",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "identifier": "com.habee.zoh-ai-monitor",
   "build": {
     "beforeDevCommand": "npm run start",
@@ -41,7 +41,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk1QjU2Q0JDMEQxMzhGMzUKUldRMWp4TU52R3kxbFF4UVJGa1g1ZGpLbWMrQjROeEdtaXpQSzlFbXVWZGduRDJrYW90bW1hejkK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIwOEY4RDRDOTYzRjg5MEYKUldRUGlUK1dUSTJQc0czeVFoYi9HMkwwLytKWGs2SzU1T2N1T3NZcjM5VzdERVBCUEJucURXdUIK",
       "endpoints": [
         "https://raw.githubusercontent.com/Habeeb-Rahman-CA/zoh-ai-monitor/main/update.json"
       ]
