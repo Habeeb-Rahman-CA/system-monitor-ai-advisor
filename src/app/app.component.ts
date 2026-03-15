@@ -136,29 +136,15 @@ interface EnvironmentInfo {
   python_version: string;
   rust_version: string;
   git_version: string;
+  java_version: string;
+  go_version: string;
+  dotnet_version: string;
+  php_version: string;
   os_details: string;
   shell_type: string;
+  env_vars: { [key: string]: string };
 }
 
-interface HttpRequest {
-  method: string;
-  url: string;
-  headers: { [key: string]: string };
-  body: string | null;
-}
-
-interface HttpResponse {
-  status: number;
-  headers: { [key: string]: string };
-  body: string;
-  time_ms: number;
-}
-
-interface SavedApiRequest {
-  id: string;
-  name: string;
-  request: HttpRequest;
-}
 
 interface DevAdvice {
   id: string;
@@ -338,7 +324,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   lastMgmtRefresh = 0;
   isLoadingMgmt = false;
   mgmtSubTab: 'services' | 'startup' = 'services';
-  devSubTab: 'ports' | 'servers' | 'coding' | 'docker' | 'db' | 'pkg' | 'git' | 'env' | 'api' = 'ports';
+  devSubTab: 'ports' | 'servers' | 'coding' | 'docker' | 'db' | 'pkg' | 'git' | 'env' = 'ports';
   services: ServiceInfo[] = [];
   startupApps: StartupInfo[] = [];
   activePorts: PortInfo[] = [];
@@ -355,23 +341,9 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   p_filteredPkgManagers: PkgManagerInfo[] = [];
   gitStatus: GitStatus | null = null;
   environmentInfo: EnvironmentInfo | null = null;
+  envSearchTerm: string = '';
+  filteredEnvVars: { key: string, value: string }[] = [];
 
-  // API Tool State
-  apiCollections: SavedApiRequest[] = [];
-  currentApiRequest: HttpRequest = {
-    method: 'GET',
-    url: 'https://jsonplaceholder.typicode.com/posts/1',
-    headers: { 'Content-Type': 'application/json' },
-    body: ''
-  };
-  apiResponse: HttpResponse | null = null;
-  apiHeadersList: { key: string, value: string }[] = [{ key: 'Content-Type', value: 'application/json' }];
-  isLoadingApi = false;
-  isSavingApi = false;
-  isSaveModalOpen = false;
-  saveRequestName = '';
-  editingRequestId: string | null = null;
-  apiCollectionName = '';
   isLoadingPorts = false;
   isLoadingServers = false;
   isLoadingCoding = false;
@@ -1291,8 +1263,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       } else if (this.devSubTab === 'env') {
         this.isLoadingEnv = true;
         this.environmentInfo = await invoke<EnvironmentInfo>('get_environment_info');
-      } else if (this.devSubTab === 'api') {
-        await this.loadApiCollections();
+        this.updateFilteredEnvVars();
       }
       this.lastPortsRefresh = Date.now();
       this.analyzeDevEnvironment();
@@ -1421,6 +1392,20 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       this.p_filteredDockerContainers = this.dockerContainers.filter(c =>
         c.name.toLowerCase().includes(term) || c.image.toLowerCase().includes(term)
       );
+    }
+  }
+
+  updateFilteredEnvVars() {
+    if (!this.environmentInfo) return;
+    const term = this.envSearchTerm.toLowerCase();
+    const all = Object.entries(this.environmentInfo.env_vars).map(([key, value]) => ({ key, value }));
+
+    if (!term) {
+      this.filteredEnvVars = all.sort((a, b) => a.key.localeCompare(b.key));
+    } else {
+      this.filteredEnvVars = all
+        .filter(item => item.key.toLowerCase().includes(term) || item.value.toLowerCase().includes(term))
+        .sort((a, b) => a.key.localeCompare(b.key));
     }
   }
 
@@ -1563,7 +1548,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     this.updateFilteredPkgManagers();
   }
 
-  setDevSubTab(tab: 'ports' | 'servers' | 'coding' | 'docker' | 'db' | 'pkg' | 'git' | 'env' | 'api') {
+  setDevSubTab(tab: 'ports' | 'servers' | 'coding' | 'docker' | 'db' | 'pkg' | 'git' | 'env') {
     this.devSubTab = tab;
     this.refreshDevData();
   }
@@ -1576,123 +1561,6 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  // --- API Tool Methods ---
-
-  addApiHeader() {
-    this.apiHeadersList.push({ key: '', value: '' });
-  }
-
-  removeApiHeader(index: number) {
-    this.apiHeadersList.splice(index, 1);
-  }
-
-  async sendApiRequest() {
-    if (!this.currentApiRequest.url) return;
-    this.isLoadingApi = true;
-    this.apiResponse = null;
-
-    // Sync headers map from list
-    const headers: { [key: string]: string } = {};
-    this.apiHeadersList.forEach(h => {
-      if (h.key.trim()) headers[h.key] = h.value;
-    });
-    this.currentApiRequest.headers = headers;
-
-    try {
-      this.apiResponse = await invoke<HttpResponse>('send_api_request', { req: this.currentApiRequest });
-    } catch (e) {
-      alert("API Request failed: " + e);
-    } finally {
-      this.isLoadingApi = false;
-      this.cdr.markForCheck();
-    }
-  }
-
-  async loadApiCollections() {
-    try {
-      this.apiCollections = await invoke<SavedApiRequest[]>('get_saved_api_collections');
-    } catch (e) {
-      console.error("Failed to load API collections", e);
-    }
-  }
-
-  async saveToCollection() {
-    this.isSavingApi = true;
-
-    // Sync headers
-    const headers: { [key: string]: string } = {};
-    this.apiHeadersList.forEach(h => {
-      if (h.key.trim()) headers[h.key] = h.value;
-    });
-    this.currentApiRequest.headers = headers;
-
-    const saved: SavedApiRequest = {
-      id: this.editingRequestId || Math.random().toString(36).substring(7),
-      name: this.apiCollectionName,
-      request: { ...this.currentApiRequest }
-    };
-
-    try {
-      await invoke('save_api_request', { request: saved });
-      await this.loadApiCollections();
-      this.editingRequestId = saved.id; // Keep the ID for next saves
-    } catch (e) {
-      alert("Failed to save request: " + e);
-    } finally {
-      this.isSavingApi = false;
-      this.cdr.markForCheck();
-    }
-  }
-
-  loadFromCollection(item: SavedApiRequest) {
-    this.currentApiRequest = { ...item.request };
-    this.editingRequestId = item.id;
-    this.apiCollectionName = item.name;
-    this.apiHeadersList = Object.entries(item.request.headers).map(([key, value]) => ({ key, value }));
-    if (this.apiHeadersList.length === 0) this.apiHeadersList.push({ key: '', value: '' });
-    this.activeTab = 'dev';
-    this.devSubTab = 'api';
-    this.cdr.markForCheck();
-  }
-
-  showSaveApiModal() {
-    this.saveRequestName = this.apiCollectionName || '';
-    this.isSaveModalOpen = true;
-    this.cdr.markForCheck();
-  }
-
-  closeSaveApiModal() {
-    this.isSaveModalOpen = false;
-    this.saveRequestName = '';
-    this.cdr.markForCheck();
-  }
-
-  async confirmSaveApiRequest() {
-    if (!this.saveRequestName.trim()) return;
-    this.apiCollectionName = this.saveRequestName;
-    this.isSaveModalOpen = false;
-    await this.saveToCollection();
-  }
-
-  async deleteFromCollection(id: string, event: Event) {
-    event.stopPropagation();
-    if (!confirm("Are you sure you want to delete this saved request?")) return;
-    try {
-      await invoke('delete_api_request', { id });
-      await this.loadApiCollections();
-    } catch (e) {
-      alert("Failed to delete request: " + e);
-    }
-  }
-
-  formatJsonResponse(body: string): string {
-    try {
-      const obj = JSON.parse(body);
-      return JSON.stringify(obj, null, 2);
-    } catch (e) {
-      return body;
-    }
-  }
 
   async controlDocker(id: string, action: string) {
     try {

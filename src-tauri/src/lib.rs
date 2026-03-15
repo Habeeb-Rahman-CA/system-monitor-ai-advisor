@@ -125,8 +125,13 @@ struct EnvironmentInfo {
     python_version: String,
     rust_version: String,
     git_version: String,
+    java_version: String,
+    go_version: String,
+    dotnet_version: String,
+    php_version: String,
     os_details: String,
     shell_type: String,
+    env_vars: std::collections::HashMap<String, String>,
 }
 
 #[derive(Serialize)]
@@ -1070,6 +1075,10 @@ async fn get_environment_info() -> Result<EnvironmentInfo, String> {
         python_version: "Not found".to_string(),
         rust_version: "Not found".to_string(),
         git_version: "Not found".to_string(),
+        java_version: "Not found".to_string(),
+        go_version: "Not found".to_string(),
+        dotnet_version: "Not found".to_string(),
+        php_version: "Not found".to_string(),
         os_details: format!(
             "{} {} ({})",
             System::name().unwrap_or_default(),
@@ -1077,6 +1086,7 @@ async fn get_environment_info() -> Result<EnvironmentInfo, String> {
             System::cpu_arch()
         ),
         shell_type: "Unknown".to_string(),
+        env_vars: std::env::vars().collect(),
     };
 
     // Node Version
@@ -1106,6 +1116,37 @@ async fn get_environment_info() -> Result<EnvironmentInfo, String> {
             .replace("git version", "")
             .trim()
             .to_string();
+    }
+
+    // Java Version
+    if let Ok(out) = create_silent_command("java").arg("-version").output() {
+        // Java prints version to stderr
+        let s = String::from_utf8_lossy(&out.stderr);
+        if let Some(line) = s.lines().next() {
+            info.java_version = line.replace("java version", "").replace("openjdk version", "").trim().to_string();
+        }
+    }
+
+    // Go Version
+    if let Ok(out) = create_silent_command("go").arg("version").output() {
+        info.go_version = String::from_utf8_lossy(&out.stdout)
+            .split_whitespace()
+            .nth(2)
+            .unwrap_or("Unknown")
+            .to_string();
+    }
+
+    // .NET Version
+    if let Ok(out) = create_silent_command("dotnet").arg("--version").output() {
+        info.dotnet_version = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    }
+
+    // PHP Version
+    if let Ok(out) = create_silent_command("php").arg("-v").output() {
+        let s = String::from_utf8_lossy(&out.stdout);
+        if let Some(line) = s.lines().next() {
+            info.php_version = line.split_whitespace().nth(1).unwrap_or("Unknown").to_string();
+        }
     }
 
     // Shell Type
